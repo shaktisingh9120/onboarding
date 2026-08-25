@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Cost Comparison</title>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top-header">
+  <div class="brand">
+    <img src="logo.png" class="brand-logo" alt="Flabs">
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- DASHBOARD -->
+  <div class="dashboard">
+    <div class="card blue">
+      <h3>Total Tests</h3>
+      <span id="totalCount">0</span>
+    </div>
+
+    <div class="card green">
+      <h3>Updated Prices</h3>
+      <span id="updatedCount">0</span>
+    </div>
+
+    <div class="card yellow">
+      <h3>Same Price</h3>
+      <span id="sameCount">0</span>
+    </div>
+
+    <div class="card gray">
+      <h3>Unmatched</h3>
+      <span id="unmatchedCount">0</span>
+    </div>
+  </div>
+
+  <h1>🔵 Test Cost Comparison Tool</h1>
+
+  <!-- UPLOADS -->
+  <div class="upload-box">
+    <label>Upload Flabs Sheet</label>
+    <input type="file" id="sheet1File" accept=".xlsx,.xls,.csv">
+  </div>
+
+  <div class="upload-box">
+    <label>Upload Client Sheet (Col A: Test Name, Col B: Price)</label>
+    <input type="file" id="sheet2File" accept=".xlsx,.xls,.csv">
+  </div>
+
+  <!-- ACTION -->
+  <button onclick="compareSheets()">Compare & Update</button>
+
+  <!-- EXPORT BUTTONS -->
+  <div class="export-row">
+    <button class="export" onclick="exportUpdated()">⬇ Export Updated</button>
+    <button class="export same-btn" onclick="exportSame()">⬇ Export Same</button>
+    <button class="export unmatched-btn" onclick="exportUnmatched()">⬇ Export Unmatched</button>
+  </div>
+
+  <!-- FILTER -->
+  <div class="filter-box">
+    <label>View:</label>
+    <select onchange="applyFilter(this.value)">
+      <option value="all">All</option>
+      <option value="updated">Updated Price</option>
+      <option value="same">Same Price</option>
+      <option value="unmatched">Unmatched</option>
+    </select>
+  </div>
+
+  <!-- TABLES -->
+  <h2>Sheet-1 (Flabs – Updated)</h2>
+  <div id="sheet1Table"></div>
+
+  <h2>Sheet-2 (Matched Tests)</h2>
+  <div id="sheet2Table"></div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

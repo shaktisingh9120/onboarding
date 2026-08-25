@@ -1,0 +1,76 @@
+body{
+    margin:0;
+    font-family:Segoe UI;
+    background:linear-gradient(135deg,#0f4c81,#1e90ff);
+}
+
+.top-header{
+    background:white;
+    padding:10px 25px;
+}
+
+.brand-logo{
+    height:55px;
+}
+
+.container{
+    max-width:900px;
+    margin:40px auto;
+    background:white;
+    border-radius:15px;
+    padding:30px;
+    box-shadow:0 15px 30px rgba(0,0,0,.2);
+}
+
+h1{
+    text-align:center;
+    color:#0f4c81;
+}
+
+.upload-box{
+    margin-top:25px;
+}
+
+label{
+    font-weight:600;
+    display:block;
+    margin-bottom:10px;
+}
+
+input{
+    width:100%;
+}
+
+.preview-box{
+    margin-top:25px;
+    text-align:center;
+}
+
+.preview-box img{
+    max-width:100%;
+    max-height:450px;
+    border:1px solid #ddd;
+    border-radius:10px;
+}
+
+.buttons{
+    display:flex;
+    gap:15px;
+    margin-top:25px;
+}
+
+button{
+    flex:1;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#1e90ff;
+    color:white;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#0f4c81;
+}

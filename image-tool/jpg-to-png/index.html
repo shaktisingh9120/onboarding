@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Tool</title>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+<header class="top-header">
+    <img src="logo.png" class="brand-logo">
+</header>
+
+<div class="container">
+
+    <h1>🖼️ Image Toolkit</h1>
+
+    <div class="upload-box">
+        <label>Select JPG / PNG Image</label>
+        <input type="file" id="imageInput" accept=".jpg,.jpeg,.png">
+    </div>
+
+    <div class="preview-box">
+        <img id="previewImage">
+    </div>
+
+    <div class="buttons">
+
+        <button onclick="convertToPNG()">
+            Convert To PNG
+        </button>
+
+        <button onclick="convertToJPG()">
+            Convert To JPG
+        </button>
+
+        <button onclick="downloadImage()">
+            Download
+        </button>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>

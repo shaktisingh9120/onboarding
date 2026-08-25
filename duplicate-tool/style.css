@@ -1,0 +1,89 @@
+.justified-row {
+  background-color: #f8d7da !important;
+}
+
+.dash-card {
+  color: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.control-bar {
+  background: #f8f9fb;
+  padding: 12px 16px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* logo*/
+.top-header {
+  background-color: #FFFFFF; 
+  height: 64px;              
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+/* ---------- Mobile & Tablet Responsive ---------- */
+@media (max-width: 768px) {
+
+  .page-wrapper {
+    padding: 20px 10px;
+  }
+
+  .content-card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .page-title {
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .file-input {
+    font-size: 14px;
+    padding: 8px;
+  }
+
+  .content-card h4 {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Small Mobile Devices ---------- */
+@media (max-width: 480px) {
+
+  .content-card {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .file-input {
+    font-size: 13px;
+  }
+
+  .content-card h4 {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    background: #0b4f9c;
+    color: #fff;
+    padding: 12px;
+    text-align: center;
+    font-weight: 600;
+  }
+}
+
+

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab Onboarding – Flabs</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+
+  <script>
+    if (sessionStorage.getItem("loggedIn") !== "true") {
+      window.location.href = "../index.html";
+    }
+  </script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="top-header">
+  <div class="brand">
+    <img src="logo.png" class="brand-logo" alt="Flabs">
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <a href="../home/index.html" class="btn-back"><i class="bi bi-arrow-left-circle"></i> Dashboard</a>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<!-- PAGE WRAPPER -->
+<div class="page-wrapper">
+
+  <!-- PAGE TITLE -->
+  <div class="page-title-bar">
+    <div>
+      <h4 class="page-title"><i class="bi bi-hospital me-2"></i>Lab Onboarding</h4>
+      <p class="page-sub">Track every lab from assigned to live — and file the 6 PM report in one click</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="firebase-badge" id="fbStatus">
+        <i class="bi bi-circle-fill me-1" style="font-size:8px"></i> Connecting...
+      </span>
+      <button class="btn btn-export" onclick="openExcelExport()">
+        <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
+      </button>
+      <button class="btn btn-export" onclick="exportZip()">
+        <i class="bi bi-archive me-1"></i> Export ZIP
+      </button>
+    </div>
+  </div>
+
+  <!-- SHIFT BAR: 09:00 → 18:00 -->
+  <div class="shift-bar">
+    <div class="shift-track"><div class="shift-fill" id="shiftFill"></div></div>
+    <div class="shift-labels">
+      <span>09:00</span>
+      <span id="shiftMsg">—</span>
+      <span>18:00 · Report</span>
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-primary">
+        <div><h6>Total Labs</h6><h2 id="statTotal">—</h2></div>
+        <i class="bi bi-building stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-info text-dark">
+        <div><h6>In Onboarding</h6><h2 id="statOnboard">—</h2></div>
+        <i class="bi bi-arrow-repeat stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-success">
+        <div><h6>Live</h6><h2 id="statLive">—</h2></div>
+        <i class="bi bi-check-circle stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-danger">
+        <div><h6>Blocked</h6><h2 id="statBlocked">—</h2></div>
+        <i class="bi bi-slash-circle stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-warning text-dark">
+        <div><h6>Overdue</h6><h2 id="statOverdue">—</h2></div>
+        <i class="bi bi-hourglass-split stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-dark">
+        <div><h6>Escalations</h6><h2 id="statEscalated">—</h2></div>
+        <i class="bi bi-exclamation-triangle stat-icon"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <ul class="nav nav-tabs mb-4" id="mainTab">
+    <li class="nav-item">
+      <button class="nav-link active" id="tab-register-btn" onclick="switchTab('register')">
+        <i class="bi bi-plus-circle me-1"></i>Register Lab
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-bulk-btn" onclick="switchTab('bulk')">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Bulk Import
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-directory-btn" onclick="switchTab('directory')">
+        <i class="bi bi-diagram-3 me-1"></i>Onboarding Pipeline
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-tracker-btn" onclick="switchTab('tracker')">
+        <i class="bi bi-calendar-check me-1"></i>Daily Tracker
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-report-btn" onclick="switchTab('report')">
+        <i class="bi bi-clipboard-data me-1"></i>6 PM Report
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-docs-btn" onclick="switchTab('docs')">
+        <i class="bi bi-folder2-open me-1"></i>Documents
+      </button>
+    </li>
+  </ul>
+
+  <!-- ========== REGISTER TAB ========== -->
+  <div id="tab-register">
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-info-circle me-2"></i>Lab Information</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Lab Name <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="labName" placeholder="e.g. Central Diagnostics Lab">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Lab Code</label>
+          <input type="text" class="form-control" id="labCode" placeholder="e.g. CDL-001">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Status <span class="text-danger">*</span></label>
+          <!-- options built from STATUSES in script.js -->
+          <select class="form-select" id="labStatus"></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Priority <span class="text-danger">*</span></label>
+          <select class="form-select" id="labPriority">
+            <option value="">Select priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">City / Location</label>
+          <input type="text" class="form-control" id="labCity" placeholder="e.g. New Delhi">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label"><i class="bi bi-person-badge me-1"></i>Assignee Name</label>
+          <input type="text" class="form-control" id="labAssignee" list="assigneeList"
+                 placeholder="Who owns this onboarding">
+          <div class="form-hint mt-1">If the name already exists, pick it from the list — keeps one person from being spelt three ways.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label"><i class="bi bi-briefcase me-1"></i>Sales Person</label>
+          <input type="text" class="form-control" id="labSalesPerson" list="salesList"
+                 placeholder="Who closed this account">
+          <div class="form-hint mt-1">Reference only — this doesn't change anything in the onboarding pipeline.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ONBOARDING TIMELINE -->
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-signpost-split me-2"></i>Onboarding Timeline</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Current Stage</label>
+          <select class="form-select" id="labStage"></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Assigned On</label>
+          <input type="date" class="form-control" id="labAssignedOn">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Go-Live Target</label>
+          <input type="date" class="form-control" id="labGoLiveTarget">
+        </div>
+      </div>
+      <p class="form-hint mt-2">
+        <i class="bi bi-lightbulb me-1"></i>Every stage change is date-stamped, so each lab keeps its own
+        assigned → live history. Miss the go-live target and the lab shows up under Overdue in the 6 PM report.
+      </p>
+    </div>
+
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-person-lines-fill me-2"></i>Contact</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Contact Person</label>
+          <input type="text" class="form-control" id="labContact" placeholder="In-charge name">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Contact Email</label>
+          <input type="email" class="form-control" id="labEmail" placeholder="lab@hospital.com">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" class="form-control" id="labPhone" placeholder="+91 XXXXX XXXXX">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Notes / Remarks</label>
+          <textarea class="form-control" id="labNotes" rows="3" placeholder="Any additional details..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENT UPLOAD -->
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-paperclip me-2"></i>Upload Documents</h5>
+      <div class="doc-type-row mb-3">
+        <div class="doc-type-btn selected" id="dtype-pdf" onclick="selectDocType('PDF Report')">
+          <i class="bi bi-file-earmark-pdf"></i><span>PDF Report</span>
+        </div>
+        <div class="doc-type-btn" id="dtype-excel" onclick="selectDocType('Excel / CSV')">
+          <i class="bi bi-file-earmark-spreadsheet"></i><span>Excel / CSV</span>
+        </div>
+        <div class="doc-type-btn" id="dtype-drlist" onclick="selectDocType('Doctor List')">
+          <i class="bi bi-people"></i><span>Doctor List</span>
+        </div>
+        <div class="doc-type-btn" id="dtype-other" onclick="selectDocType('Other')">
+          <i class="bi bi-file-earmark"></i><span>Other</span>
+        </div>
+      </div>
+      <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <i class="bi bi-cloud-arrow-up upload-icon"></i>
+        <p class="upload-text">Click to upload or drag &amp; drop</p>
+        <p class="upload-hint">PDF, XLS, XLSX, CSV, DOC, DOCX supported</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".pdf,.xls,.xlsx,.csv,.doc,.docx" style="display:none" onchange="handleFiles(this.files)">
+      <div id="pendingFileList" class="mt-3"></div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap mb-5">
+      <button class="btn btn-primary px-4" onclick="saveLab()" id="saveBtn">
+        <i class="bi bi-save me-1"></i>Save Lab to Firebase
+      </button>
+      <button class="btn btn-outline-secondary px-4" onclick="resetForm()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== BULK IMPORT TAB ========== -->
+  <div id="tab-bulk" style="display:none">
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import labs from Excel</h5>
+
+      <div class="bulk-steps">
+        <div class="bulk-step">
+          <span class="bulk-step-n">1</span>
+          <div>
+            <strong>Download the template</strong>
+            <p>One row per lab. Only <em>Lab Name</em> is compulsory — everything else can stay blank.</p>
+            <button class="btn btn-outline-primary btn-sm" onclick="downloadImportTemplate()">
+              <i class="bi bi-download me-1"></i>Download template (.xlsx)
+            </button>
+          </div>
+        </div>
+        <div class="bulk-step">
+          <span class="bulk-step-n">2</span>
+          <div>
+            <strong>Upload the filled sheet</strong>
+            <p>Your own sheet works too — column order doesn't matter and extra columns are ignored.</p>
+          </div>
+        </div>
+        <div class="bulk-step">
+          <span class="bulk-step-n">3</span>
+          <div>
+            <strong>Check the preview, then import</strong>
+            <p>Labs already registered are flagged and left unticked, so re-uploading the same sheet is safe.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-zone mt-3" id="bulkZone" onclick="document.getElementById('bulkFile').click()">
+        <i class="bi bi-file-earmark-spreadsheet upload-icon"></i>
+        <p class="upload-text">Click to upload or drag &amp; drop your sheet</p>
+        <p class="upload-hint">XLSX, XLS or CSV — the first sheet is read</p>
+      </div>
+      <input type="file" id="bulkFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportPick(this)">
+    </div>
+
+    <div class="content-card">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="section-heading mb-0"><i class="bi bi-eye me-2"></i>Preview before anything is saved</h5>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="selectAllImportRows(true)">Tick all</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="selectAllImportRows(false)">Untick all</button>
+        </div>
+      </div>
+
+      <div id="bulkPreview">
+        <p class="text-muted text-center py-4">
+          Nothing loaded yet. Upload a sheet above and every row shows up here first — nothing reaches
+          Firebase until you press Import.
+        </p>
+      </div>
+
+      <div id="bulkActions" class="d-flex gap-2 flex-wrap mt-3" style="display:none">
+        <button class="btn btn-primary px-4" id="bulkImportBtn" onclick="runBulkImport()">
+          <i class="bi bi-cloud-upload me-1"></i>Import
+        </button>
+        <button class="btn btn-outline-secondary" onclick="clearImport()">
+          <i class="bi bi-x-circle me-1"></i>Discard this file
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== PIPELINE / DIRECTORY TAB ========== -->
+  <div id="tab-directory" style="display:none">
+    <div class="content-card">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="section-heading mb-0"><i class="bi bi-list-check me-2"></i>Registered Labs</h5>
+        <div class="d-flex gap-2 flex-wrap">
+          <select class="form-select form-select-sm w-auto" id="filterAssignee" onchange="renderDirectory()">
+            <option value="">All Assignees</option>
+          </select>
+          <select class="form-select form-select-sm w-auto" id="filterStage" onchange="renderDirectory()"></select>
+          <select class="form-select form-select-sm w-auto" id="filterStatus" onchange="renderDirectory()"></select>
+          <select class="form-select form-select-sm w-auto" id="filterPriority" onchange="renderDirectory()">
+            <option value="">All Priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-primary">
+            <tr>
+              <th>#</th><th>Lab</th><th>Stage</th><th>Move</th>
+              <th>Dates</th><th>Days</th><th>Priority</th><th>Blocked</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="labTableBody">
+            <tr><td colspan="9" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading from Firebase...
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-hint mt-2">
+        <i class="bi bi-info-circle me-1"></i>Use the arrows to move a lab to the next stage — the date gets
+        stamped automatically. Click the eye icon for the full assigned → live journey.
+      </p>
+    </div>
+  </div>
+
+  <!-- ========== DAILY TRACKER TAB ========== -->
+  <div id="tab-tracker" style="display:none">
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-pencil-square me-2"></i>Log today's work</h5>
+
+      <!-- Quick row — this is all most entries need -->
+      <div class="log-quick">
+        <select class="form-select" id="logLab" onchange="onLogLabChange()" title="Lab"></select>
+        <input type="text" class="form-control" id="logActivity" title="What happened"
+               placeholder="What happened — e.g. Mindray BC-6200 interfaced"
+               onkeydown="if(event.key==='Enter') saveLogEntry()">
+        <select class="form-select" id="logStatus" onchange="onLogStatusChange()" title="Status">
+          <option value="done">✅ Completed</option>
+          <option value="progress">🟡 In Progress</option>
+          <option value="blocked">🔴 Blocked</option>
+        </select>
+        <button class="btn btn-outline-secondary" id="logMoreBtn" onclick="toggleLogAdvanced()" title="Stage, owner, blocker, due date">
+          <i class="bi bi-sliders me-1"></i>More
+        </button>
+        <button class="btn btn-primary" id="logSaveBtn" onclick="saveLogEntry()">
+          <i class="bi bi-plus-circle me-1"></i>Add entry
+        </button>
+        <button class="btn btn-outline-secondary" id="logCancelBtn" style="display:none" onclick="resetLogForm()">Cancel</button>
+      </div>
+
+      <!-- Everything else, out of the way until it's needed -->
+      <div class="log-advanced" id="logAdvanced" style="display:none">
+        <div class="log-adv-field">
+          <label class="form-label">Stage</label>
+          <select class="form-select form-select-sm" id="logStage"></select>
+        </div>
+        <div class="log-adv-field">
+          <label class="form-label">Owner</label>
+          <input type="text" class="form-control form-control-sm" id="logOwner" list="assigneeList" placeholder="Auto-fills from assignee">
+        </div>
+        <div class="log-adv-field">
+          <label class="form-label">Blocker reason</label>
+          <select class="form-select form-select-sm" id="logBlocker" disabled></select>
+        </div>
+        <div class="log-adv-field">
+          <label class="form-label">Due / follow-up</label>
+          <input type="date" class="form-control form-control-sm" id="logDue">
+        </div>
+        <div class="log-adv-field log-adv-check">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="logEsc">
+            <label class="form-check-label" for="logEsc">🚨 Escalate</label>
+          </div>
+        </div>
+      </div>
+
+      <p class="form-hint mt-2">
+        <i class="bi bi-lightbulb me-1"></i>Enter saves the entry. ⚙️ blocker tags file under System issues,
+        🏢 tags under Client-side — the 6 PM report sorts itself.
+      </p>
+    </div>
+
+    <div class="content-card">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="shiftTrackDate(-1)"><i class="bi bi-chevron-left"></i></button>
+          <input type="date" class="form-control form-control-sm w-auto" id="trackDate" onchange="renderTracker()">
+          <button class="btn btn-sm btn-outline-secondary" onclick="shiftTrackDate(1)"><i class="bi bi-chevron-right"></i></button>
+          <span class="track-count" id="trackCount"></span>
+        </div>
+        <select class="form-select form-select-sm w-auto" id="filterLogLab" onchange="renderTracker()">
+          <option value="">All Labs</option>
+        </select>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-primary">
+            <tr>
+              <th>Lab</th><th>Activity</th><th>Stage</th><th>Owner</th>
+              <th>Status</th><th>Blocker</th><th>Due</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="trackerBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 6 PM REPORT TAB ========== -->
+  <div id="tab-report" style="display:none">
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="content-card mb-3">
+          <h5 class="section-heading"><i class="bi bi-chat-left-text me-2"></i>Your input</h5>
+          <label class="form-label">Team performance — the part only you know</label>
+          <textarea class="form-control mb-3" id="rTeam" rows="3" oninput="renderReport()"
+            placeholder="Counts fill in automatically. Add context: who's stretched, who needs cover..."></textarea>
+          <label class="form-label">Anything else for the room</label>
+          <textarea class="form-control mb-3" id="rExtra" rows="2" oninput="renderReport()" placeholder="Optional."></textarea>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-primary" onclick="copyReport()"><i class="bi bi-clipboard me-1"></i>Copy report</button>
+            <button class="btn btn-outline-primary" onclick="saveReport()"><i class="bi bi-archive me-1"></i>Archive</button>
+            <button class="btn btn-outline-secondary" onclick="downloadReport()"><i class="bi bi-download me-1"></i>.txt</button>
+          </div>
+        </div>
+
+        <div class="content-card">
+          <h5 class="section-heading"><i class="bi bi-bar-chart-line me-2"></i>What's actually blocking go-lives</h5>
+          <div id="patternBox"></div>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="content-card">
+          <h5 class="section-heading"><i class="bi bi-clipboard-data me-2"></i>Enterprise Onboarding — 6 PM</h5>
+          <pre class="report-out" id="rOut"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== DOCS TAB ========== -->
+  <div id="tab-docs" style="display:none">
+    <div class="content-card">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="section-heading mb-0"><i class="bi bi-files me-2"></i>All Documents</h5>
+        <select class="form-select form-select-sm w-auto" id="filterDocType" onchange="renderDocs()">
+          <option value="">All Types</option>
+          <option value="PDF Report">PDF Report</option>
+          <option value="Excel / CSV">Excel / CSV</option>
+          <option value="Doctor List">Doctor List</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div id="docsContainer">
+        <p class="text-muted text-center py-4">
+          <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page-wrapper -->
+
+<!-- DETAIL MODAL -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f4c81;color:#fff;">
+        <h5 class="modal-title" id="modalLabName">Lab Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-warning" onclick="openEditLab(viewingLabId)">
+          <i class="bi bi-pencil-square me-1"></i>Edit details
+        </button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT LAB MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f4c81;color:#fff;">
+        <h5 class="modal-title" id="editModalTitle">Edit Lab</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <h6 class="modal-sec mt-0"><i class="bi bi-info-circle me-1"></i>Lab information</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Lab Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="eName">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Lab Code</label>
+            <input type="text" class="form-control" id="eCode">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Status</label>
+            <select class="form-select" id="eStatus"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="ePriority">
+              <option value="">—</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">City / Location</label>
+            <input type="text" class="form-control" id="eCity">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-person-badge me-1"></i>Assignee Name</label>
+            <input type="text" class="form-control" id="eAssignee" list="assigneeList" placeholder="Who owns this onboarding">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-briefcase me-1"></i>Sales Person</label>
+            <input type="text" class="form-control" id="eSalesPerson" list="salesList" placeholder="Who closed this account">
+          </div>
+        </div>
+
+        <h6 class="modal-sec"><i class="bi bi-signpost-split me-1"></i>Onboarding timeline</h6>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Current Stage</label>
+            <select class="form-select" id="eStage" onchange="onEditStageChange()"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Assigned On</label>
+            <input type="date" class="form-control" id="eAssignedOn">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Go-Live Target</label>
+            <input type="date" class="form-control" id="eGoLiveTarget">
+          </div>
+          <div class="col-md-4" id="eGoLiveOnWrap" style="display:none">
+            <label class="form-label">Went Live On</label>
+            <input type="date" class="form-control" id="eGoLiveOn">
+          </div>
+        </div>
+        <p class="form-hint mt-2">
+          <i class="bi bi-exclamation-circle me-1"></i>Changing the stage here rewrites the journey history —
+          move it forward and today's date gets stamped, roll it back and the later stages are dropped.
+          For normal day-to-day progress use the arrows in the pipeline instead.
+        </p>
+
+        <h6 class="modal-sec"><i class="bi bi-person-lines-fill me-1"></i>Contact</h6>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Contact Person</label>
+            <input type="text" class="form-control" id="eContact">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Contact Email</label>
+            <input type="email" class="form-control" id="eEmail">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" id="ePhone">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes / Remarks</label>
+            <textarea class="form-control" id="eNotes" rows="3"></textarea>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="eSaveBtn" onclick="saveLabEdit()">
+          <i class="bi bi-check-circle me-1"></i>Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXCEL EXPORT MODAL -->
+<div class="modal fade" id="excelModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f4c81;color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Export to Excel</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <h6 class="modal-sec mt-0"><i class="bi bi-funnel me-1"></i>Which labs</h6>
+        <label class="xl-opt">
+          <input class="form-check-input" type="radio" name="xlScope" id="xlScopeAll" value="all" checked>
+          <span>
+            <strong>All registered labs</strong>
+            <span class="xl-scope-count">—</span>
+          </span>
+        </label>
+        <label class="xl-opt">
+          <input class="form-check-input" type="radio" name="xlScope" id="xlScopeFiltered" value="filtered">
+          <span>
+            <strong>Only what the pipeline filters are showing</strong>
+            <span class="xl-scope-count">—</span>
+          </span>
+        </label>
+
+        <h6 class="modal-sec"><i class="bi bi-layers me-1"></i>Extra sheets</h6>
+        <p class="form-hint mb-2">
+          The <strong>Labs</strong> sheet always goes in — one row per lab with its notes, latest remark
+          and open blocker reasons already on it. Tick these only if you need the detail behind those columns.
+        </p>
+        <label class="xl-opt">
+          <input class="form-check-input" type="checkbox" id="xlLogs" checked>
+          <span><strong>Daily Remarks</strong><span class="xl-scope-count">Every log entry — date, remark, owner, status, blocker</span></span>
+        </label>
+        <label class="xl-opt">
+          <input class="form-check-input" type="checkbox" id="xlBlockers" checked>
+          <span><strong>Open Blockers</strong><span class="xl-scope-count">Only what's still stuck, oldest first, with days open</span></span>
+        </label>
+        <label class="xl-opt">
+          <input class="form-check-input" type="checkbox" id="xlJourney">
+          <span><strong>Stage Journey</strong><span class="xl-scope-count">Assigned → Live stage by stage, with days spent in each</span></span>
+        </label>
+        <label class="xl-opt">
+          <input class="form-check-input" type="checkbox" id="xlDocs">
+          <span><strong>Documents</strong><span class="xl-scope-count">File names, types and download links</span></span>
+        </label>
+
+        <p class="form-hint mt-3 mb-0">
+          <i class="bi bi-info-circle me-1"></i>Dates come through as real Excel dates and every sheet has
+          filters switched on, so you can sort and pivot straight away.
+        </p>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="xlBtn" onclick="exportExcel()">
+          <i class="bi bi-file-earmark-excel me-1"></i>Download .xlsx
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared type-ahead of everyone already on a lab.
+     Lives at body level so the register tab, the edit modal and the daily
+     tracker's Owner field all see it, whichever tab happens to be open. -->
+<datalist id="assigneeList"></datalist>
+<datalist id="salesList"></datalist>
+
+<!-- TOAST -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="liveToast" class="toast align-items-center text-bg-primary border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg">Saved!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Firebase SDKs (compat version – works without bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+<script src="firebase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

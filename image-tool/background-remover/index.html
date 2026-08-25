@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Background Remover</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <h1>🪄 AI Background Remover</h1>
+
+  <input type="file" id="imageInput" accept="image/*">
+
+  <button onclick="removeBackground()">
+    Remove Background
+  </button>
+
+  <div class="preview">
+
+    <div>
+      <h3>Original</h3>
+      <img id="originalPreview">
+    </div>
+
+    <div>
+      <h3>Result</h3>
+      <img id="resultPreview">
+    </div>
+
+  </div>
+
+  <button id="downloadBtn" style="display:none">
+    Download PNG
+  </button>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

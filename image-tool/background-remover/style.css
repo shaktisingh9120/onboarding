@@ -1,0 +1,41 @@
+body{
+  font-family:Segoe UI;
+  background:linear-gradient(135deg,#0f4c81,#1e90ff);
+  margin:0;
+}
+
+.container{
+  max-width:1000px;
+  margin:40px auto;
+  background:#fff;
+  padding:30px;
+  border-radius:15px;
+}
+
+h1{
+  text-align:center;
+  color:#0f4c81;
+}
+
+.preview{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+  margin-top:30px;
+}
+
+img{
+  max-width:100%;
+  border:1px solid #ddd;
+  border-radius:10px;
+}
+
+button{
+  background:#1e90ff;
+  color:#fff;
+  border:none;
+  padding:12px 20px;
+  margin-top:15px;
+  border-radius:8px;
+  cursor:pointer;
+}

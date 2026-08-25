@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// Firebase Storage rules for flabs-tools.
+//
+// Paste these at: Firebase Console → Storage → Rules → Publish.
+//
+// Why the default rules break this tool:
+//   The default is `allow read, write: if request.auth != null;`
+//   flabs-tools has no Firebase Auth — the login is a sessionStorage flag —
+//   so request.auth is always null and every upload fails with
+//   storage/unauthorized. That is what was stopping documents from saving.
+//
+// These rules scope access to the labs/ folder only, cap uploads at 25 MB
+// and restrict them to the document types the tool actually accepts.
+// Everything else in the bucket stays locked.
+//
+// NOTE: this is open to anyone who has the bucket name. That matches how
+// the rest of flabs-tools already works (Firestore is open the same way),
+// and it is fine for an internal tool behind a shared link. If lab documents
+// ever hold anything you would not want a stranger to read, move the tool
+// onto Firebase Auth and swap the conditions below for `request.auth != null`.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /labs/{labId}/{docType}/{fileName} {
+
+      allow read: if true;
+
+      allow write: if request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType.matches(
+                        'application/pdf'
+                        + '|application/vnd.ms-excel'
+                        + '|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        + '|application/msword'
+                        + '|application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        + '|text/csv'
+                        + '|text/plain'
+                        + '|application/octet-stream'
+                      );
+
+      allow delete: if true;
+    }
+
+    // Nothing outside labs/ is reachable.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

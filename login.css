@@ -1,0 +1,53 @@
+.login-box *,
+.login-box *::before,
+.login-box *::after {
+  box-sizing: border-box;
+}
+
+
+body {
+  margin: 0;
+  height: 100vh;
+  background: linear-gradient(135deg, #0f4c81, #1e90ff);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: Segoe UI, sans-serif;
+}
+
+.login-box {
+  background: #fff;
+  padding: 30px;
+  width: 320px;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.3);
+  text-align: center;
+}
+
+.logo {
+  width: 120px;
+  margin-bottom: 15px;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #1e90ff;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#error {
+  color: red;
+  margin-top: 10px;
+}

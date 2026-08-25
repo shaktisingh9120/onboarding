@@ -1,0 +1,177 @@
+/* GLOBAL */
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #0f4c81, #1e90ff);
+  margin: 0;
+}
+
+/* HEADER */
+.top-header {
+  background: #ffffff;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.brand-logo {
+  height: 40px;
+}
+
+/* CONTAINER */
+.container {
+  max-width: 1100px;
+  margin: 40px auto;
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+}
+
+/* TITLES */
+h1, h2 {
+  color: #0f4c81;
+  text-align: center;
+}
+
+/* UPLOADS */
+.upload-box {
+  margin: 20px 0;
+}
+
+label {
+  font-weight: 600;
+  color: #0f4c81;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+/* BUTTONS */
+button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  background: #1e90ff;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.95;
+}
+
+button.export {
+  background: #0b6edc;
+}
+
+/* EXPORT ROW */
+.export-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.export-row button {
+  flex: 1;
+}
+
+.same-btn {
+  background: #f1c40f;
+  color: #333;
+}
+
+.unmatched-btn {
+  background: #7f8c8d;
+}
+
+/* FILTER */
+.filter-box {
+  margin: 24px 0;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th {
+  background: #1e90ff;
+  color: #fff;
+  padding: 10px;
+  font-size: 14px;
+}
+
+td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  font-size: 13px;
+}
+
+table tr:hover td {
+  background: #eef6ff;
+}
+
+/* ROW STATES */
+.updated {
+  background: #fff2cc;
+}
+
+.same {
+  background: #d9ead3;
+}
+
+.matched {
+  background: #d9ead3;
+}
+
+/* DASHBOARD */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.card {
+  padding: 18px;
+  border-radius: 14px;
+  text-align: center;
+  color: #fff;
+  font-weight: bold;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(0,0,0,0.25);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.card span {
+  font-size: 28px;
+  margin-top: 8px;
+  display: block;
+}
+
+/* CARD COLORS */
+.blue { background: #1e90ff; }
+.green { background: #2ecc71; }
+.yellow { background: #f1c40f; color: #333; }
+.gray { background: #7f8c8d; }

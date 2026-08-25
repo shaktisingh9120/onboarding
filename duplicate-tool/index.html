@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Duplicate Test Justifier</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="top-header">
+  <div class="brand">
+    <img src="logo.png" class="brand-logo" alt="Flabs">
+  
+  </div>
+</header>
+<div class="container my-4">
+
+  <h3 class="text-primary mb-3">🧪 Duplicate Test Justifier</h3>
+
+  <input type="file" id="fileInput" class="form-control mb-4" accept=".xlsx,.csv">
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="row g-3 mb-4 d-none">
+
+    <div class="col-md-3">
+      <div class="dash-card bg-primary">
+        <div>
+          <h6>Total Rows</h6>
+          <h2 id="totalRows">0</h2>
+        </div>
+        📄
+      </div>
+    </div>
+
+    <div class="col-md-3">
+    <div class="dash-card bg-success">
+        <div>
+        <h6>Unique Rows</h6>
+          <h2 id="uniqueTests">0</h2>
+        </div>
+        🧪
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="dash-card bg-danger">
+        <div>
+          <h6>Duplicate Rows</h6>
+          <h2 id="duplicateRows">0</h2>
+        </div>
+        ⚠️
+      </div>
+    </div>
+
+   <div class="col-md-3">
+      <div class="dash-card bg-dark">
+        <div>
+          <h6>Duplicate %</h6>
+          <h2 id="duplicatePercent">0%</h2>
+        </div>
+        📊
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROL BAR -->
+  <div id="filterBox" class="control-bar d-none mb-4">
+    <div>
+      <label class="fw-bold me-2">Filter</label>
+      <select class="form-select d-inline w-auto" onchange="filterRows(this.value)">
+        <option value="all">Show All</option>
+        <option value="dup">Red Duplicates Only</option>
+      </select>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button id="downloadRedBtn" class="btn btn-danger">⬇ Download Red</button>
+      <button id="downloadJustifiedBtn" class="btn btn-success">⬇ Justified</button>
+      <button id="downloadSourceBtn" class="btn btn-outline-primary">⬇ Source</button>
+    </div>
+  </div>
+
+  <h5>Upload Flabs Sheet</h5>
+  <p>Column (A)-Test Id,Column (B)-Test Name</p>
+  <div class="table-responsive">
+    <table class="table table-bordered" id="sheet1Table"></table>
+  </div>
+
+  <h5 class="mt-4">Unique Tests (Justified)</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered" id="uniqueTable"></table>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
+

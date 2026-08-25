@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PNG Compressor</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://unpkg.com/upng-js@2.1.0/UPNG.js"></script>
+
+</head>
+<body>
+
+<div class="container">
+
+    <h1>🖼️ PNG Image Compressor</h1>
+
+    <div class="upload-section">
+
+        <input type="file"
+               id="imageInput"
+               accept="image/png">
+
+        <select id="targetSize">
+            <option value="10">10 KB</option>
+            <option value="20">20 KB</option>
+            <option value="30">30 KB</option>
+            <option value="50" selected>50 KB</option>
+            <option value="75">75 KB</option>
+            <option value="100">100 KB</option>
+            <option value="150">150 KB</option>
+            <option value="200">200 KB</option>
+        </select>
+
+        <button onclick="compressImage()">
+            Compress Image
+        </button>
+
+    </div>
+
+    <div id="result" class="result-box" style="display:none;">
+
+        <img id="preview">
+
+        <div class="info">
+            <p>
+                Original Size:
+                <span id="originalSize"></span>
+            </p>
+
+            <p>
+                Compressed Size:
+                <span id="compressedSize"></span>
+            </p>
+
+            <p>
+                Reduction:
+                <span id="reduction"></span>
+            </p>
+        </div>
+
+        <button id="downloadBtn">
+            Download PNG
+        </button>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
