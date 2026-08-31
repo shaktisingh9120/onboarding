@@ -70,27 +70,33 @@
   <!-- STAT CARDS -->
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-primary">
+      <div class="dash-card bg-primary dash-card-clickable" onclick="applyDashboardFilter('total')" title="Show all labs">
         <div><h6>Total Labs</h6><h2 id="statTotal">—</h2></div>
         <i class="bi bi-building stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-info text-dark">
+      <div class="dash-card bg-info text-dark dash-card-clickable" onclick="applyDashboardFilter('onboarding')" title="Show labs in onboarding">
         <div><h6>In Onboarding</h6><h2 id="statOnboard">—</h2></div>
         <i class="bi bi-arrow-repeat stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-success">
+      <div class="dash-card bg-success dash-card-clickable" onclick="applyDashboardFilter('live')" title="Show live labs">
         <div><h6>Live</h6><h2 id="statLive">—</h2></div>
         <i class="bi bi-check-circle stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-danger">
-        <div><h6>Blocked</h6><h2 id="statBlocked">—</h2></div>
-        <i class="bi bi-slash-circle stat-icon"></i>
+      <div class="dash-card bg-danger dash-card-clickable" onclick="applyDashboardFilter('hold')" title="Show labs on hold">
+        <div><h6>Hold</h6><h2 id="statHold">—</h2></div>
+        <i class="bi bi-pause-circle stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card bg-secondary dash-card-clickable" onclick="applyDashboardFilter('lost')" title="Show lost labs">
+        <div><h6>Lost</h6><h2 id="statLost">—</h2></div>
+        <i class="bi bi-x-circle stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
@@ -342,16 +348,16 @@
         <h5 class="section-heading mb-0"><i class="bi bi-list-check me-2"></i>Registered Labs</h5>
         <div class="d-flex gap-2 flex-wrap">
           <input type="text" class="form-control form-control-sm" id="filterLabName" style="width:200px"
-                 placeholder="Search lab name…" oninput="renderDirectory()">
-          <select class="form-select form-select-sm w-auto" id="filterAssignee" onchange="renderDirectory()">
+                 placeholder="Search lab name…" oninput="clearOnboardingQuickFilter(); renderDirectory()">
+          <select class="form-select form-select-sm w-auto" id="filterAssignee" onchange="clearOnboardingQuickFilter(); renderDirectory()">
             <option value="">All Assignees</option>
           </select>
-          <select class="form-select form-select-sm w-auto" id="filterSalesPerson" onchange="renderDirectory()">
+          <select class="form-select form-select-sm w-auto" id="filterSalesPerson" onchange="clearOnboardingQuickFilter(); renderDirectory()">
             <option value="">All Sales Persons</option>
           </select>
-          <select class="form-select form-select-sm w-auto" id="filterStage" onchange="renderDirectory()"></select>
-          <select class="form-select form-select-sm w-auto" id="filterStatus" onchange="renderDirectory()"></select>
-          <select class="form-select form-select-sm w-auto" id="filterPriority" onchange="renderDirectory()">
+          <select class="form-select form-select-sm w-auto" id="filterStage" onchange="clearOnboardingQuickFilter(); renderDirectory()"></select>
+          <select class="form-select form-select-sm w-auto" id="filterStatus" onchange="clearOnboardingQuickFilter(); renderDirectory()"></select>
+          <select class="form-select form-select-sm w-auto" id="filterPriority" onchange="clearOnboardingQuickFilter(); renderDirectory()">
             <option value="">All Priority</option>
             <option value="High">High</option>
             <option value="Medium">Medium</option>
