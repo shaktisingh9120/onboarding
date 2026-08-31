@@ -249,12 +249,21 @@ function populateNameLists() {
     f.value = cur;
   }
 
+  const salesNames = allSalesPeople();
+  const spf = document.getElementById("filterSalesPerson");
+  if (spf) {
+    const cur = spf.value;
+    spf.innerHTML = `<option value="">All Sales Persons</option><option value="__none__">— Unassigned —</option>` +
+      salesNames.map(n => `<option value="${esc(n)}"${n === cur ? " selected" : ""}>${esc(n)}</option>`).join("");
+    spf.value = cur;
+  }
+
   // Shared type-aheads so the same person isn't typed three different ways.
   const dl = document.getElementById("assigneeList");
   if (dl) dl.innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
 
   const sl = document.getElementById("salesList");
-  if (sl) sl.innerHTML = allSalesPeople().map(n => `<option value="${esc(n)}">`).join("");
+  if (sl) sl.innerHTML = salesNames.map(n => `<option value="${esc(n)}">`).join("");
 }
 
 // When a lab is picked, default the stage to whatever that lab is currently on,
@@ -647,9 +656,13 @@ function filteredLabs() {
   const pf = document.getElementById("filterPriority")?.value || "";
   const gf = document.getElementById("filterStage")?.value    || "";
   const af = document.getElementById("filterAssignee")?.value || "";
+  const spf = document.getElementById("filterSalesPerson")?.value || "";
+  const nf = (document.getElementById("filterLabName")?.value || "").trim().toLowerCase();
   return labs.filter(l =>
     (!sf || l.status === sf) && (!pf || l.priority === pf) && (!gf || (l.stage || "Assigned") === gf) &&
-    (!af || (af === "__none__" ? !l.assignee : l.assignee === af)));
+    (!af || (af === "__none__" ? !l.assignee : l.assignee === af)) &&
+    (!spf || (spf === "__none__" ? !l.salesPerson : l.salesPerson === spf)) &&
+    (!nf || (l.name || "").toLowerCase().includes(nf)));
 }
 
 // ── Directory ────────────────────────────────────────────────
