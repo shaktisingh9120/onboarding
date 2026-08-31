@@ -152,9 +152,39 @@ function updateStats() {
   set("statTotal",     labs.length);
   set("statOnboard",   labs.filter(l => !isLive(l)).length);
   set("statLive",      labs.filter(isLive).length);
-  set("statBlocked",   openBlocked().length);
+  set("statHold",      labs.filter(l => l.status === "Hold").length);
+  set("statLost",      labs.filter(l => l.status === "Lost").length);
   set("statOverdue",   labs.filter(labOverdue).length + overdueLogs().length);
   set("statEscalated", openEscalated().length);
+}
+
+// ── Dashboard card → pipeline quick filters ─────────────────
+// "In Onboarding" has no single dropdown value (it means "stage != Live"),
+// so it's tracked separately and combined into filteredLabs() below.
+// Clicking any other filter control cancels it, so it never lingers
+// and produces a result the visible dropdowns don't explain.
+let onboardingQuickFilter = false;
+
+function clearOnboardingQuickFilter() { onboardingQuickFilter = false; }
+
+function applyDashboardFilter(type) {
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  setVal("filterLabName", "");
+  setVal("filterAssignee", "");
+  setVal("filterSalesPerson", "");
+  setVal("filterStage", "");
+  setVal("filterStatus", "");
+  setVal("filterPriority", "");
+  onboardingQuickFilter = false;
+
+  if (type === "live")        setVal("filterStage", "Live");
+  else if (type === "hold")   setVal("filterStatus", "Hold");
+  else if (type === "lost")   setVal("filterStatus", "Lost");
+  else if (type === "onboarding") onboardingQuickFilter = true;
+  // "total" leaves every filter cleared
+
+  switchTab("directory");
+  renderDirectory();
 }
 
 // ── Shift bar: 09:00 → 18:00 countdown to the report ────────
@@ -662,7 +692,8 @@ function filteredLabs() {
     (!sf || l.status === sf) && (!pf || l.priority === pf) && (!gf || (l.stage || "Assigned") === gf) &&
     (!af || (af === "__none__" ? !l.assignee : l.assignee === af)) &&
     (!spf || (spf === "__none__" ? !l.salesPerson : l.salesPerson === spf)) &&
-    (!nf || (l.name || "").toLowerCase().includes(nf)));
+    (!nf || (l.name || "").toLowerCase().includes(nf)) &&
+    (!onboardingQuickFilter || !isLive(l)));
 }
 
 // ── Directory ────────────────────────────────────────────────
