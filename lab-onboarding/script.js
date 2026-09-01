@@ -719,11 +719,14 @@ function renderDirectory() {
       : days < 0 ? `<span class="cell-sub">starts ${pretty(l.assignedOn)}</span>`
       : `<span class="days-pill">${days}d</span>`;
     return `
-    <tr class="${labOverdue(l) ? "row-overdue" : ""}">
+    <tr class="${[labOverdue(l) ? "row-overdue" : "", l.status === "Hold" ? "row-hold" : ""].filter(Boolean).join(" ")}">
       <td>${i+1}</td>
       <td>
         <strong>${esc(l.name)}</strong>
         <div class="cell-sub">${esc(l.city || "—")}${l.code ? " · " + esc(l.code) : ""}</div>
+        <div class="mt-1">
+          <span class="status-badge badge-status-${statusSlug(l.status)}">${l.status === "Hold" ? "⏸ " : ""}${esc(l.status || "—")}</span>
+        </div>
         ${l.assignee
           ? `<span class="assignee-pill"><i class="bi bi-person-fill"></i>${esc(l.assignee)}</span>`
           : `<span class="assignee-pill is-none"><i class="bi bi-person-dash"></i>Unassigned</span>`}
