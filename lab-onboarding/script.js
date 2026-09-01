@@ -135,6 +135,9 @@ function setFbStatus(state) {
 const stageIndex   = lab => Math.max(0, STAGES.indexOf(lab.stage || "Assigned"));
 const stagePercent = lab => Math.round(stageIndex(lab) / (STAGES.length - 1) * 100);
 const isLive       = lab => (lab.stage || "") === "Live";
+// "In Onboarding" means actively moving through the pipeline — a lab put on
+// Hold has left that flow, so it's excluded here and counted only under Hold.
+const inOnboarding = lab => !isLive(lab) && lab.status !== "Hold";
 const labById      = id  => labs.find(l => l.id === id);
 
 // A lab is overdue when its target go-live date has passed and it isn't Live yet.
@@ -150,7 +153,7 @@ const overdueLogs  = () => logs.filter(l => l.status !== "done" && l.dueDate && 
 function updateStats() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set("statTotal",     labs.length);
-  set("statOnboard",   labs.filter(l => !isLive(l)).length);
+  set("statOnboard",   labs.filter(inOnboarding).length);
   set("statLive",      labs.filter(isLive).length);
   set("statHold",      labs.filter(l => l.status === "Hold").length);
   set("statLost",      labs.filter(l => l.status === "Lost").length);
@@ -693,7 +696,7 @@ function filteredLabs() {
     (!af || (af === "__none__" ? !l.assignee : l.assignee === af)) &&
     (!spf || (spf === "__none__" ? !l.salesPerson : l.salesPerson === spf)) &&
     (!nf || (l.name || "").toLowerCase().includes(nf)) &&
-    (!onboardingQuickFilter || !isLive(l)));
+    (!onboardingQuickFilter || inOnboarding(l)));
 }
 
 // ── Directory ────────────────────────────────────────────────
@@ -976,10 +979,10 @@ function buildReport() {
   const perf = owners.map(o => {
     const closed  = dayLogs.filter(l => l.owner === o && l.status === "done").length;
     const open    = logs.filter(l => l.owner === o && l.status !== "done").length;
-    const myLabs  = labs.filter(l => l.assignee === o && !isLive(l)).length;
+    const myLabs  = labs.filter(l => l.assignee === o && inOnboarding(l)).length;
     return `   • ${o}: ${closed} closed today, ${open} still open${myLabs ? `, ${myLabs} lab${myLabs===1?"":"s"} in onboarding` : ""}`;
   });
-  const unassigned = labs.filter(l => !l.assignee && !isLive(l)).length;
+  const unassigned = labs.filter(l => !l.assignee && inOnboarding(l)).length;
   if (unassigned) perf.push(`   • Unassigned: ${unassigned} lab${unassigned===1?"":"s"} with no owner yet`);
   const teamNote = document.getElementById("rTeam")?.value.trim() || "";
 
@@ -1034,7 +1037,7 @@ ${join(nextDay)}`;
 
   if (extra) out += `\n\n📝 Notes:\n   • ${extra.replace(/\n/g, "\n   • ")}`;
 
-  out += `\n\n📊 Pipeline: ${labs.filter(l => !isLive(l)).length} labs in onboarding · ${labs.filter(isLive).length} live`;
+  out += `\n\n📊 Pipeline: ${labs.filter(inOnboarding).length} labs in onboarding · ${labs.filter(isLive).length} live`;
   return out;
 }
 
