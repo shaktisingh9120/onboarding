@@ -279,6 +279,8 @@ body {
 .cell-sub { font-size: 11.5px; color: #8a97a3; line-height: 1.35; }
 
 .table tbody tr.row-overdue { background: #fff8f8; }
+.table tbody tr.row-hold { background: #fff6ec; border-left: 3px solid #e8850c; }
+.table tbody tr.row-hold td:first-child { padding-left: 9px; }
 
 /* ===== STAGE PIPELINE ===== */
 .stage-name { font-weight: 700; color: #0f4c81; font-size: 12.5px; margin-bottom: 4px; }
