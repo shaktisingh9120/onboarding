@@ -136,8 +136,9 @@ const stageIndex   = lab => Math.max(0, STAGES.indexOf(lab.stage || "Assigned"))
 const stagePercent = lab => Math.round(stageIndex(lab) / (STAGES.length - 1) * 100);
 const isLive       = lab => (lab.stage || "") === "Live";
 // "In Onboarding" means actively moving through the pipeline — a lab put on
-// Hold has left that flow, so it's excluded here and counted only under Hold.
-const inOnboarding = lab => !isLive(lab) && lab.status !== "Hold";
+// Hold or marked Lost has left that flow, so both are excluded here and
+// counted only under their own stat (Hold / Lost).
+const inOnboarding = lab => !isLive(lab) && lab.status !== "Hold" && lab.status !== "Lost";
 const labById      = id  => labs.find(l => l.id === id);
 
 // A lab is overdue when its target go-live date has passed and it isn't Live yet.
