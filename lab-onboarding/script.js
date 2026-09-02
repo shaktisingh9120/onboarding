@@ -81,6 +81,7 @@ window.addEventListener("DOMContentLoaded", () => {
   listenToLogs();
   tickShiftBar();
   setInterval(tickShiftBar, 30000);
+  setInterval(checkAssignedOverdue, 5 * 60000); // re-check every 5 min — a lab can cross 7 days with no data change
 });
 
 function logout() {
@@ -96,6 +97,7 @@ function listenToLabs() {
     populateLabSelect();
     populateNameLists();
     updateStats();
+    checkAssignedOverdue();
     renderDirectory();
     renderDocs();
     renderReport();
@@ -161,6 +163,67 @@ function updateStats() {
   set("statOverdue",   labs.filter(labOverdue).length + overdueLogs().length);
   set("statEscalated", openEscalated().length);
 }
+
+// ── Assigned > 7 days notifications ─────────────────────────
+// Labs still moving through the pipeline (not Live/Hold/Lost) whose
+// assignedOn date is more than 7 days ago. Bell badge + dropdown always
+// reflect the live count; a one-time toast pops per lab per session the
+// first time it crosses the 7-day mark, so refreshes don't spam it.
+const ASSIGNED_ALERT_DAYS = 7;
+const notifSeen = new Set(JSON.parse(sessionStorage.getItem("notifSeen") || "[]"));
+
+function getAssignedOverdueLabs() {
+  return labs
+    .filter(l => inOnboarding(l) && l.assignedOn && daysBetween(l.assignedOn, today()) > ASSIGNED_ALERT_DAYS)
+    .map(l => ({ ...l, daysSince: daysBetween(l.assignedOn, today()) }))
+    .sort((a, b) => b.daysSince - a.daysSince);
+}
+
+function checkAssignedOverdue() {
+  const overdue = getAssignedOverdueLabs();
+  const badge = document.getElementById("notifBadge");
+  const bell  = document.getElementById("notifBell");
+  const list  = document.getElementById("notifList");
+  if (!badge || !bell || !list) return;
+
+  bell.classList.toggle("has-alerts", overdue.length > 0);
+  badge.classList.toggle("d-none", overdue.length === 0);
+  badge.textContent = overdue.length > 9 ? "9+" : overdue.length;
+
+  list.innerHTML = overdue.length
+    ? overdue.map(l => `
+        <div class="notif-item" onclick="toggleNotifPanel(false); showDetail('${l.id}')">
+          <div>
+            <div class="notif-item-name">${esc(l.name)}</div>
+            <div class="notif-item-sub">Assigned ${pretty(l.assignedOn)} · ${esc(l.stage || "Assigned")}</div>
+          </div>
+          <span class="notif-item-days">${l.daysSince}d</span>
+        </div>`).join("")
+    : `<div class="notif-empty"><i class="bi bi-check2-circle" style="font-size:22px"></i><br>Nothing over ${ASSIGNED_ALERT_DAYS} days</div>`;
+
+  // Toast for newly-crossed labs only, once per lab per session.
+  const fresh = overdue.filter(l => !notifSeen.has(l.id));
+  if (fresh.length === 1) {
+    showToast(`⏰ ${fresh[0].name} was assigned ${fresh[0].daysSince} days ago — still not live`, "warning");
+  } else if (fresh.length > 1) {
+    showToast(`⏰ ${fresh.length} labs have been assigned for more than ${ASSIGNED_ALERT_DAYS} days`, "warning");
+  }
+  fresh.forEach(l => notifSeen.add(l.id));
+  if (fresh.length) sessionStorage.setItem("notifSeen", JSON.stringify([...notifSeen]));
+}
+
+function toggleNotifPanel(force) {
+  const panel = document.getElementById("notifPanel");
+  if (!panel) return;
+  const show = typeof force === "boolean" ? force : panel.classList.contains("d-none");
+  panel.classList.toggle("d-none", !show);
+}
+
+document.addEventListener("click", e => {
+  const wrap  = document.getElementById("notifBell")?.closest(".notif-wrap");
+  const panel = document.getElementById("notifPanel");
+  if (wrap && panel && !wrap.contains(e.target)) panel.classList.add("d-none");
+});
 
 // ── Dashboard card → pipeline quick filters ─────────────────
 // "In Onboarding" has no single dropdown value (it means "stage != Live"),
