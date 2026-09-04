@@ -101,6 +101,7 @@ function listenToLabs() {
     renderDirectory();
     renderDocs();
     renderReport();
+    renderAnalysis();
     setFbStatus("connected");
   }, err => {
     console.error(err);
@@ -148,7 +149,6 @@ const labOverdue = lab => !isLive(lab) && lab.goLiveTarget && lab.goLiveTarget <
 
 // A blocked log stays blocked until someone changes its status — not just for one day.
 const openBlocked  = () => logs.filter(l => l.status === "blocked");
-const openEscalated= () => logs.filter(l => l.escalated && l.status !== "done");
 const logsOn       = date => logs.filter(l => l.date === date);
 const overdueLogs  = () => logs.filter(l => l.status !== "done" && l.dueDate && l.dueDate < today());
 
@@ -161,7 +161,6 @@ function updateStats() {
   set("statHold",      labs.filter(l => l.status === "Hold").length);
   set("statLost",      labs.filter(l => l.status === "Lost").length);
   set("statOverdue",   labs.filter(labOverdue).length + overdueLogs().length);
-  set("statEscalated", openEscalated().length);
 }
 
 // ── Assigned > 7 days notifications ─────────────────────────
@@ -882,7 +881,6 @@ async function saveLogEntry() {
     status,
     blocker:   status === "blocked" ? document.getElementById("logBlocker").value : "",
     dueDate:   document.getElementById("logDue").value || "",
-    escalated: document.getElementById("logEsc").checked,
     updatedAt: Date.now()
   };
 
@@ -904,7 +902,6 @@ function resetLogForm() {
   editingLogId = null;
   ["logActivity","logOwner","logDue"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("logStatus").value = "done";
-  document.getElementById("logEsc").checked  = false;
   document.getElementById("logBlocker").value = "";
   onLogStatusChange();
   toggleLogAdvanced(false);
@@ -923,11 +920,10 @@ function editLog(id) {
   document.getElementById("logOwner").value   = l.owner || "";
   document.getElementById("logStatus").value  = l.status;
   document.getElementById("logDue").value     = l.dueDate || "";
-  document.getElementById("logEsc").checked   = !!l.escalated;
   onLogStatusChange();
   document.getElementById("logBlocker").value = l.blocker || "";
   // If the entry uses any of the extra fields, show them rather than hide the edit.
-  toggleLogAdvanced(!!(l.blocker || l.dueDate || l.owner || l.escalated));
+  toggleLogAdvanced(!!(l.blocker || l.dueDate || l.owner));
   document.getElementById("logSaveBtn").innerHTML = `<i class="bi bi-check-circle me-1"></i>Update entry`;
   document.getElementById("logCancelBtn").style.display = "inline-block";
   document.getElementById("logActivity").focus();
@@ -937,13 +933,6 @@ async function quickLogStatus(id, status) {
   try {
     await logsCol.doc(id).update({ status, blocker: status === "blocked" ? (logs.find(l=>l.id===id)?.blocker || "") : "" });
   } catch (err) { showToast("Error: " + err.message, "danger"); }
-}
-
-async function toggleLogEsc(id) {
-  const l = logs.find(x => x.id === id);
-  if (!l) return;
-  try { await logsCol.doc(id).update({ escalated: !l.escalated }); }
-  catch (err) { showToast("Error: " + err.message, "danger"); }
 }
 
 async function deleteLog(id) {
@@ -987,7 +976,6 @@ function renderTracker() {
       <td class="${l.dueDate && l.dueDate < today() && l.status !== "done" ? "text-danger fw-bold" : ""}">${pretty(l.dueDate)}</td>
       <td>
         <div class="d-flex gap-1">
-          <button class="btn btn-sm ${l.escalated ? "btn-danger" : "btn-outline-secondary"}" onclick="toggleLogEsc('${l.id}')" title="Escalate">🚨</button>
           <button class="btn btn-sm btn-outline-primary" onclick="editLog('${l.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
           <button class="btn btn-sm btn-outline-danger" onclick="deleteLog('${l.id}')" title="Delete"><i class="bi bi-trash"></i></button>
         </div>
@@ -1057,10 +1045,6 @@ function buildReport() {
   const bucket = own => openBlocked().filter(l => BLOCKER_OWNER[l.blocker] === own)
     .map(l => `   • ${l.blocker} — ${labTag(l)}`);
 
-  // 🚨 Escalations
-  const escalations = openEscalated()
-    .map(l => `   • ${labTag(l)}: ${l.activity}${l.blocker ? ` — ${l.blocker}` : ""}`);
-
   // 🎯 Tomorrow
   const T = tomorrow();
   const nextDay = [
@@ -1095,9 +1079,6 @@ ${join(bucket("system"))}
 
 🏢 Client-side issues:
 ${join(bucket("client"))}
-
-🚨 Escalations required:
-${join(escalations)}
 
 🎯 Tomorrow's priorities:
 ${join(nextDay)}`;
@@ -1308,8 +1289,8 @@ async function exportZip() {
 
     // per-lab day-by-day record, Assigned → Live
     const journey = [
-      ["Date","Stage","Activity","Owner","Status","Blocker","Due","Escalated"],
-      ...mine.map(x => [x.date, x.stage, x.activity, x.owner, LOG_STATUS[x.status], x.blocker, x.dueDate, x.escalated ? "Yes" : ""])
+      ["Date","Stage","Activity","Owner","Status","Blocker","Due"],
+      ...mine.map(x => [x.date, x.stage, x.activity, x.owner, LOG_STATUS[x.status], x.blocker, x.dueDate])
     ];
     folder.file("daily_record.csv", toCsv(journey));
 
@@ -1333,10 +1314,10 @@ async function exportZip() {
     ])
   ]));
   zip.file("all_daily_logs.csv", toCsv([
-    ["Date","Lab","City","Stage","Activity","Owner","Status","Blocker","Blocker Side","Due","Escalated"],
+    ["Date","Lab","City","Stage","Activity","Owner","Status","Blocker","Blocker Side","Due"],
     ...logs.slice().sort((a,b) => a.date.localeCompare(b.date)).map(x => [
       x.date, x.labName, x.labCity, x.stage, x.activity, x.owner,
-      LOG_STATUS[x.status], x.blocker, BLOCKER_OWNER[x.blocker] || "", x.dueDate, x.escalated ? "Yes" : ""
+      LOG_STATUS[x.status], x.blocker, BLOCKER_OWNER[x.blocker] || "", x.dueDate
     ])
   ]));
   zip.file(`report_${today()}.txt`, buildReport());
@@ -1808,7 +1789,7 @@ async function exportExcel() {
       "#","Lab Name","Lab Code","City","Assignee","Sales Person","Status","Priority",
       "Current Stage","Step","% Complete",
       "Assigned On","Go-Live Target","Went Live","Days in Onboarding","Days Overdue",
-      "Open Blockers","Blocker Reasons","Open Escalations",
+      "Open Blockers","Blocker Reasons",
       "Log Entries","Last Activity On","Latest Remark",
       "Contact Person","Email","Phone","Documents","Notes / Remarks"
     ]];
@@ -1838,7 +1819,6 @@ async function exportExcel() {
         labOverdue(l) ? daysBetween(l.goLiveTarget, D) : "",
         blocked.length,
         [...new Set(blocked.map(x => x.blocker).filter(Boolean))].join("; "),
-        mine.filter(x => x.escalated && x.status !== "done").length,
         mine.length,
         last ? xlDate(last.date) : "",
         last ? `${LOG_STATUS[last.status]} — ${last.activity}` : "",
@@ -1851,14 +1831,14 @@ async function exportExcel() {
     });
 
     XLSX.utils.book_append_sheet(wb, makeSheet(labRows,
-      [5,30,12,16,16,16,10,10,24,10,12,13,14,13,17,13,14,34,16,11,15,46,20,26,15,11,50],
-      { 11:"dd/mm/yyyy", 12:"dd/mm/yyyy", 13:"dd/mm/yyyy", 20:"dd/mm/yyyy", 10:"0%" }), "Labs");
+      [5,30,12,16,16,16,10,10,24,10,12,13,14,13,17,13,14,34,11,15,46,20,26,15,11,50],
+      { 11:"dd/mm/yyyy", 12:"dd/mm/yyyy", 13:"dd/mm/yyyy", 19:"dd/mm/yyyy", 10:"0%" }), "Labs");
 
     // ── Sheet 2: the daily remarks behind those numbers ──────
     if (want("xlLogs")) {
       const rows = [[
         "Date","Lab","Lab Code","City","Assignee","Stage","Remark / Activity",
-        "Owner","Status","Blocker","Blocker Side","Due Date","Days Overdue","Escalated"
+        "Owner","Status","Blocker","Blocker Side","Due Date","Days Overdue"
       ]];
       scopedLogs.slice().sort((a,b) => b.date.localeCompare(a.date) || (a.labName||"").localeCompare(b.labName||""))
         .forEach(x => {
@@ -1871,19 +1851,18 @@ async function exportExcel() {
             x.blocker || "",
             x.blocker ? (BLOCKER_SIDE[BLOCKER_OWNER[x.blocker]] || "Internal") : "",
             xlDate(x.dueDate),
-            (x.dueDate && x.dueDate < D && x.status !== "done") ? daysBetween(x.dueDate, D) : "",
-            x.escalated ? "Yes" : ""
+            (x.dueDate && x.dueDate < D && x.status !== "done") ? daysBetween(x.dueDate, D) : ""
           ]);
         });
-      if (rows.length === 1) rows.push(["", "No log entries for the labs exported", "", "", "", "", "", "", "", "", "", "", "", ""]);
+      if (rows.length === 1) rows.push(["", "No log entries for the labs exported", "", "", "", "", "", "", "", "", "", "", ""]);
       XLSX.utils.book_append_sheet(wb, makeSheet(rows,
-        [12,28,12,16,16,24,52,16,14,30,13,12,13,10],
+        [12,28,12,16,16,24,52,16,14,30,13,12,13],
         { 0:"dd/mm/yyyy", 11:"dd/mm/yyyy" }), "Daily Remarks");
     }
 
     // ── Sheet 3: what's still stuck, oldest first ────────────
     if (want("xlBlockers")) {
-      const rows = [["Lab","City","Assignee","Blocker","Side","Blocked Since","Days Open","Activity","Owner","Due Date","Escalated"]];
+      const rows = [["Lab","City","Assignee","Blocker","Side","Blocked Since","Days Open","Activity","Owner","Due Date"]];
       scopedLogs.filter(x => x.status === "blocked")
         .sort((a,b) => a.date.localeCompare(b.date))
         .forEach(x => {
@@ -1895,13 +1874,12 @@ async function exportExcel() {
             xlDate(x.date),
             daysBetween(x.date, D),
             x.activity || "", x.owner || "",
-            xlDate(x.dueDate),
-            x.escalated ? "Yes" : ""
+            xlDate(x.dueDate)
           ]);
         });
-      if (rows.length === 1) rows.push(["Nothing blocked right now", "", "", "", "", "", "", "", "", "", ""]);
+      if (rows.length === 1) rows.push(["Nothing blocked right now", "", "", "", "", "", "", "", "", ""]);
       XLSX.utils.book_append_sheet(wb, makeSheet(rows,
-        [28,16,16,30,12,14,11,50,16,12,10],
+        [28,16,16,30,12,14,11,50,16,12],
         { 5:"dd/mm/yyyy", 9:"dd/mm/yyyy" }), "Open Blockers");
     }
 
@@ -1949,4 +1927,266 @@ async function exportExcel() {
     btn.disabled  = false;
     btn.innerHTML = `<i class="bi bi-file-earmark-excel me-1"></i>Download .xlsx`;
   }
+}
+
+// ============================================================
+//  ONBOARDING ANALYSIS DASHBOARD
+//  Sales Person-wise / Assignee-wise MIS view.
+//  Reuses the existing labs[] data and the isLive/inOnboarding
+//  helpers already used by the top stat cards — no dummy data,
+//  no duplicate status logic.
+// ============================================================
+let anCharts = {};
+
+function openAnalysis() {
+  populateAnalysisFilters();
+  renderAnalysis();
+  const modalEl = document.getElementById("analysisModal");
+  if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function resetAnalysisFilters() {
+  ["anFilterSales", "anFilterAssignee", "anFilterStatus", "anFilterFrom", "anFilterTo", "anFilterSearch"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  renderAnalysis();
+}
+
+// Populate dropdowns once (skip if already built, so a user's mid-selection
+// filter isn't wiped out every time labs[] updates in real time).
+function populateAnalysisFilters() {
+  const sp = document.getElementById("anFilterSales");
+  const as = document.getElementById("anFilterAssignee");
+  const st = document.getElementById("anFilterStatus");
+  if (sp && sp.dataset.built !== "1") {
+    sp.innerHTML = `<option value="">All Sales Persons</option>` +
+      allSalesPeople().map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    sp.dataset.built = "1";
+  }
+  if (as && as.dataset.built !== "1") {
+    as.innerHTML = `<option value="">All Assignees</option>` +
+      allAssignees().map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join("");
+    as.dataset.built = "1";
+  }
+  if (st && st.dataset.built !== "1") {
+    st.innerHTML = `<option value="">All Status</option>` +
+      STATUSES.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    st.dataset.built = "1";
+  }
+}
+
+function analysisFilteredLabs() {
+  const sp   = document.getElementById("anFilterSales")?.value    || "";
+  const as   = document.getElementById("anFilterAssignee")?.value || "";
+  const st   = document.getElementById("anFilterStatus")?.value   || "";
+  const from = document.getElementById("anFilterFrom")?.value     || "";
+  const to   = document.getElementById("anFilterTo")?.value       || "";
+  const q    = (document.getElementById("anFilterSearch")?.value || "").toLowerCase().trim();
+
+  return labs.filter(l => {
+    if (sp && (l.salesPerson || "") !== sp) return false;
+    if (as && (l.assignee    || "") !== as) return false;
+    if (st && (l.status      || "") !== st) return false;
+    if (from && (!l.assignedOn || l.assignedOn < from)) return false;
+    if (to   && (!l.assignedOn || l.assignedOn > to))   return false;
+    if (q && !(l.name || "").toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+// Same buckets as the top-level stat cards: Live / Onboarding / Hold / Lost,
+// derived from isLive() and inOnboarding() so the analysis view can never
+// drift out of sync with the main dashboard's definitions.
+function anBucketCounts(list) {
+  return {
+    total:      list.length,
+    live:       list.filter(isLive).length,
+    onboarding: list.filter(inOnboarding).length,
+    hold:       list.filter(l => l.status === "Hold").length,
+    lost:       list.filter(l => l.status === "Lost").length
+  };
+}
+
+function anGroupCounts(list, field) {
+  const groups = {};
+  list.forEach(l => {
+    const key = (l[field] || "").trim() || "Unassigned";
+    (groups[key] ||= []).push(l);
+  });
+  return Object.entries(groups)
+    .map(([name, items]) => ({ name, ...anBucketCounts(items) }))
+    .sort((a, b) => b.total - a.total);
+}
+
+const AN_COLORS = { live: "#198754", onboarding: "#17a2b8", hold: "#dc3545", lost: "#6c757d" };
+
+function renderAnalysis() {
+  if (!document.getElementById("analysisModal") || typeof Chart === "undefined") return;
+
+  const filtered = analysisFilteredLabs();
+  const overall  = anBucketCounts(filtered);
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set("anTotal",    overall.total);
+  set("anLive",     overall.live);
+  set("anOnboard",  overall.onboarding);
+  set("anHold",     overall.hold);
+  set("anLost",     overall.lost);
+  set("anLivePct",  overall.total ? Math.round(overall.live / overall.total * 100) + "%" : "—");
+
+  const bySales    = anGroupCounts(filtered, "salesPerson");
+  const byAssignee = anGroupCounts(filtered, "assignee");
+
+  anRenderBarChart("anChartSales",    bySales);
+  anRenderBarChart("anChartAssignee", byAssignee);
+  anRenderTable("anTableSales",    bySales,    "Sales Person");
+  anRenderTable("anTableAssignee", byAssignee, "Assignee");
+  anRenderDonut(overall);
+  anRenderTrend(filtered);
+}
+
+function anRenderBarChart(canvasId, groups) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (anCharts[canvasId]) anCharts[canvasId].destroy();
+
+  if (!groups.length) { anCharts[canvasId] = null; return; }
+
+  anCharts[canvasId] = new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: groups.map(g => g.name),
+      datasets: [
+        { label: "Live",       data: groups.map(g => g.live),       backgroundColor: AN_COLORS.live },
+        { label: "Onboarding", data: groups.map(g => g.onboarding), backgroundColor: AN_COLORS.onboarding },
+        { label: "Hold",       data: groups.map(g => g.hold),       backgroundColor: AN_COLORS.hold },
+        { label: "Lost",       data: groups.map(g => g.lost),       backgroundColor: AN_COLORS.lost }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          callbacks: {
+            footer: items => {
+              const total = items.reduce((s, i) => s + i.parsed.y, 0);
+              return `Total: ${total}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { autoSkip: false, maxRotation: 40, minRotation: 0, font: { size: 11 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+}
+
+function anRenderDonut(overall) {
+  const canvas = document.getElementById("anChartDonut");
+  if (!canvas) return;
+  if (anCharts.donut) anCharts.donut.destroy();
+
+  anCharts.donut = new Chart(canvas.getContext("2d"), {
+    type: "doughnut",
+    data: {
+      labels: ["Live", "Under Onboarding", "Hold", "Lost"],
+      datasets: [{
+        data: [overall.live, overall.onboarding, overall.hold, overall.lost],
+        backgroundColor: [AN_COLORS.live, AN_COLORS.onboarding, AN_COLORS.hold, AN_COLORS.lost],
+        borderWidth: 2,
+        borderColor: "#fff"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "62%",
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
+              const pct = Math.round(ctx.parsed / total * 100);
+              return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function anRenderTrend(filtered) {
+  const canvas = document.getElementById("anChartTrend");
+  if (!canvas) return;
+  if (anCharts.trend) anCharts.trend.destroy();
+
+  const months = {};
+  filtered.forEach(l => {
+    if (!l.assignedOn) return;
+    const m = l.assignedOn.slice(0, 7); // YYYY-MM
+    months[m] = (months[m] || 0) + 1;
+  });
+  const sortedMonths = Object.keys(months).sort();
+
+  if (!sortedMonths.length) { anCharts.trend = null; return; }
+
+  anCharts.trend = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: sortedMonths,
+      datasets: [{
+        label: "Labs Assigned",
+        data: sortedMonths.map(m => months[m]),
+        borderColor: "#0f4c81",
+        backgroundColor: "rgba(15,76,129,0.15)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function anRenderTable(tableId, groups, labelName) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  if (!groups.length) {
+    table.innerHTML = `
+      <thead class="table-primary"><tr>
+        <th>${esc(labelName)}</th><th>Total</th><th>Live</th><th>Onboarding</th><th>Hold</th><th>Lost</th><th>Live %</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="text-center text-muted py-3">No labs match the current filters</td></tr></tbody>`;
+    return;
+  }
+
+  table.innerHTML = `
+    <thead class="table-primary">
+      <tr><th>${esc(labelName)}</th><th>Total</th><th>Live</th><th>Onboarding</th><th>Hold</th><th>Lost</th><th>Live %</th></tr>
+    </thead>
+    <tbody>
+      ${groups.map(g => `
+        <tr>
+          <td>${esc(g.name)}</td>
+          <td>${g.total}</td>
+          <td>${g.live}</td>
+          <td>${g.onboarding}</td>
+          <td>${g.hold}</td>
+          <td>${g.lost}</td>
+          <td>${g.total ? Math.round(g.live / g.total * 100) + "%" : "—"}</td>
+        </tr>`).join("")}
+    </tbody>`;
 }
