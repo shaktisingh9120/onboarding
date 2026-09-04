@@ -13,6 +13,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <!-- JSZip -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- Chart.js (Onboarding Analysis dashboard) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
   <link rel="stylesheet" href="style.css">
 
@@ -43,6 +45,9 @@
         <div class="notif-panel-body" id="notifList"></div>
       </div>
     </div>
+    <button class="notif-bell" id="analysisBtn" onclick="openAnalysis()" title="Onboarding Analysis">
+      <i class="bi bi-graph-up-arrow"></i>
+    </button>
     <a href="../home/index.html" class="btn-back"><i class="bi bi-arrow-left-circle"></i> Dashboard</a>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
@@ -116,12 +121,6 @@
       <div class="dash-card bg-warning text-dark">
         <div><h6>Overdue</h6><h2 id="statOverdue">—</h2></div>
         <i class="bi bi-hourglass-split stat-icon"></i>
-      </div>
-    </div>
-    <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-dark">
-        <div><h6>Escalations</h6><h2 id="statEscalated">—</h2></div>
-        <i class="bi bi-exclamation-triangle stat-icon"></i>
       </div>
     </div>
   </div>
@@ -443,12 +442,6 @@
           <label class="form-label">Due / follow-up</label>
           <input type="date" class="form-control form-control-sm" id="logDue">
         </div>
-        <div class="log-adv-field log-adv-check">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="logEsc">
-            <label class="form-check-label" for="logEsc">🚨 Escalate</label>
-          </div>
-        </div>
       </div>
 
       <p class="form-hint mt-2">
@@ -720,6 +713,119 @@
         <button class="btn btn-primary" id="xlBtn" onclick="exportExcel()">
           <i class="bi bi-file-earmark-excel me-1"></i>Download .xlsx
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING ANALYSIS MODAL -->
+<div class="modal fade" id="analysisModal" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f4c81;color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-graph-up-arrow me-2"></i>Onboarding Analysis</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body an-body">
+
+        <!-- SUMMARY CARDS -->
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-primary"><div><h6>Total Labs</h6><h2 id="anTotal">—</h2></div><i class="bi bi-building stat-icon"></i></div>
+          </div>
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-success"><div><h6>Live</h6><h2 id="anLive">—</h2></div><i class="bi bi-check-circle stat-icon"></i></div>
+          </div>
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-info text-dark"><div><h6>Onboarding</h6><h2 id="anOnboard">—</h2></div><i class="bi bi-arrow-repeat stat-icon"></i></div>
+          </div>
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-danger"><div><h6>Hold</h6><h2 id="anHold">—</h2></div><i class="bi bi-pause-circle stat-icon"></i></div>
+          </div>
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-secondary"><div><h6>Lost</h6><h2 id="anLost">—</h2></div><i class="bi bi-x-circle stat-icon"></i></div>
+          </div>
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card bg-dark"><div><h6>Live Conversion</h6><h2 id="anLivePct">—</h2></div><i class="bi bi-graph-up stat-icon"></i></div>
+          </div>
+        </div>
+
+        <!-- FILTERS -->
+        <div class="content-card mb-4">
+          <h5 class="section-heading mb-3"><i class="bi bi-funnel me-2"></i>Filters</h5>
+          <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+              <label class="form-label">Sales Person</label>
+              <select class="form-select form-select-sm" id="anFilterSales" onchange="renderAnalysis()">
+                <option value="">All Sales Persons</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">Assignee</label>
+              <select class="form-select form-select-sm" id="anFilterAssignee" onchange="renderAnalysis()">
+                <option value="">All Assignees</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">Lab Status</label>
+              <select class="form-select form-select-sm" id="anFilterStatus" onchange="renderAnalysis()">
+                <option value="">All Status</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">Assigned From</label>
+              <input type="date" class="form-control form-control-sm" id="anFilterFrom" onchange="renderAnalysis()">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">Assigned To</label>
+              <input type="date" class="form-control form-control-sm" id="anFilterTo" onchange="renderAnalysis()">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">Search Lab</label>
+              <input type="text" class="form-control form-control-sm" id="anFilterSearch" placeholder="Lab name…" oninput="renderAnalysis()">
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetAnalysisFilters()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+            </button>
+          </div>
+        </div>
+
+        <!-- SALES PERSON ANALYSIS -->
+        <div class="content-card mb-4">
+          <h5 class="section-heading mb-3"><i class="bi bi-briefcase me-2"></i>Sales Person-wise Analysis</h5>
+          <div class="an-chart-wrap"><canvas id="anChartSales"></canvas></div>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm table-bordered table-hover align-middle" id="anTableSales"></table>
+          </div>
+        </div>
+
+        <!-- ASSIGNEE ANALYSIS -->
+        <div class="content-card mb-4">
+          <h5 class="section-heading mb-3"><i class="bi bi-person-badge me-2"></i>Assignee-wise Analysis</h5>
+          <div class="an-chart-wrap"><canvas id="anChartAssignee"></canvas></div>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm table-bordered table-hover align-middle" id="anTableAssignee"></table>
+          </div>
+        </div>
+
+        <!-- OVERALL STATUS + TREND -->
+        <div class="row g-3 mb-4">
+          <div class="col-lg-5">
+            <div class="content-card h-100">
+              <h5 class="section-heading mb-3"><i class="bi bi-pie-chart me-2"></i>Overall Status Distribution</h5>
+              <div class="an-chart-wrap an-chart-wrap-sm"><canvas id="anChartDonut"></canvas></div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="content-card h-100">
+              <h5 class="section-heading mb-3"><i class="bi bi-graph-up me-2"></i>Onboarding Trend (Month-wise)</h5>
+              <div class="an-chart-wrap an-chart-wrap-sm"><canvas id="anChartTrend"></canvas></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
