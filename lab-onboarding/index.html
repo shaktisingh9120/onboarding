@@ -48,6 +48,10 @@
     <button class="notif-bell" id="analysisBtn" onclick="openAnalysis()" title="Onboarding Analysis">
       <i class="bi bi-graph-up-arrow"></i>
     </button>
+    <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Switch light / dark mode">
+      <i class="bi bi-moon-stars-fill"></i>
+    </button>
+    <span class="whoami-pill" id="whoamiPill" title="Signed in as"></span>
     <a href="../home/index.html" class="btn-back"><i class="bi bi-arrow-left-circle"></i> Dashboard</a>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
@@ -88,73 +92,90 @@
   <!-- STAT CARDS -->
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-primary dash-card-clickable" onclick="applyDashboardFilter('total')" title="Show all labs">
+      <div class="dash-card dc-blue dash-card-clickable" onclick="applyDashboardFilter('total')" title="Show all labs">
         <div><h6>Total Labs</h6><h2 id="statTotal">—</h2></div>
         <i class="bi bi-building stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-info text-dark dash-card-clickable" onclick="applyDashboardFilter('onboarding')" title="Show labs in onboarding">
+      <div class="dash-card dc-teal dash-card-clickable" onclick="applyDashboardFilter('onboarding')" title="Show labs in onboarding">
         <div><h6>In Onboarding</h6><h2 id="statOnboard">—</h2></div>
         <i class="bi bi-arrow-repeat stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-success dash-card-clickable" onclick="applyDashboardFilter('live')" title="Show live labs">
+      <div class="dash-card dc-green dash-card-clickable" onclick="applyDashboardFilter('live')" title="Show live labs">
         <div><h6>Live</h6><h2 id="statLive">—</h2></div>
         <i class="bi bi-check-circle stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-danger dash-card-clickable" onclick="applyDashboardFilter('hold')" title="Show labs on hold">
+      <div class="dash-card dc-amber dash-card-clickable" onclick="applyDashboardFilter('hold')" title="Show labs on hold">
         <div><h6>Hold</h6><h2 id="statHold">—</h2></div>
         <i class="bi bi-pause-circle stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-secondary dash-card-clickable" onclick="applyDashboardFilter('lost')" title="Show lost labs">
+      <div class="dash-card dc-gray dash-card-clickable" onclick="applyDashboardFilter('lost')" title="Show lost labs">
         <div><h6>Lost</h6><h2 id="statLost">—</h2></div>
         <i class="bi bi-x-circle stat-icon"></i>
       </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-      <div class="dash-card bg-warning text-dark">
+      <div class="dash-card dc-red dash-card-clickable" onclick="applyDashboardFilter('overdue')" title="Labs past their go-live target">
         <div><h6>Overdue</h6><h2 id="statOverdue">—</h2></div>
         <i class="bi bi-hourglass-split stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card dc-amber dash-card-clickable" onclick="applyDashboardFilter('stalled')" title="No stage movement in over 5 days">
+        <div><h6>Stalled</h6><h2 id="statStalled">—</h2></div>
+        <i class="bi bi-exclamation-triangle stat-icon"></i>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="dash-card dc-purple dash-card-clickable" onclick="applyDashboardFilter('duesoon')" title="Go-live target within 3 days">
+        <div><h6>Due Soon</h6><h2 id="statDueSoon">—</h2></div>
+        <i class="bi bi-flag stat-icon"></i>
       </div>
     </div>
   </div>
 
   <!-- TABS -->
   <ul class="nav nav-tabs mb-4" id="mainTab">
-    <li class="nav-item">
+    <li class="nav-item" data-perm="register">
       <button class="nav-link active" id="tab-register-btn" onclick="switchTab('register')">
         <i class="bi bi-plus-circle me-1"></i>Register Lab
       </button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item" data-perm="bulk">
       <button class="nav-link" id="tab-bulk-btn" onclick="switchTab('bulk')">
         <i class="bi bi-file-earmark-arrow-up me-1"></i>Bulk Import
       </button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item" data-perm="directory">
       <button class="nav-link" id="tab-directory-btn" onclick="switchTab('directory')">
         <i class="bi bi-diagram-3 me-1"></i>Onboarding Pipeline
       </button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item" data-perm="tracker">
       <button class="nav-link" id="tab-tracker-btn" onclick="switchTab('tracker')">
         <i class="bi bi-calendar-check me-1"></i>Daily Tracker
       </button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item" data-perm="report">
       <button class="nav-link" id="tab-report-btn" onclick="switchTab('report')">
         <i class="bi bi-clipboard-data me-1"></i>6 PM Report
       </button>
     </li>
-    <li class="nav-item">
+    <li class="nav-item" data-perm="docs">
       <button class="nav-link" id="tab-docs-btn" onclick="switchTab('docs')">
         <i class="bi bi-folder2-open me-1"></i>Documents
+      </button>
+    </li>
+    <li class="nav-item admin-only" id="tab-users-nav" style="display:none">
+      <button class="nav-link" id="tab-users-btn" onclick="switchTab('users')">
+        <i class="bi bi-people-fill me-1"></i>Manage Users
       </button>
     </li>
   </ul>
@@ -530,6 +551,132 @@
     </div>
   </div>
 
+  <!-- ========== MANAGE USERS TAB (admin-only) ========== -->
+  <div id="tab-users" style="display:none">
+    <div class="content-card mb-4">
+      <h5 class="section-heading"><i class="bi bi-person-plus me-2"></i>Create a new user</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Full Name <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="uName" placeholder="e.g. Priya Sharma">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Email (this is their login ID) <span class="text-danger">*</span></label>
+          <input type="email" class="form-control" id="uEmail" placeholder="priya@flabs.com">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Access Level <span class="text-danger">*</span></label>
+          <select class="form-select" id="uRole" onchange="toggleCustomPerms()">
+            <option value="Custom">Custom — pick exactly what they can do</option>
+            <option value="Admin">Admin — full access, same as you</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Temporary Password <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="uPassword" placeholder="Min. 6 characters">
+            <button class="btn btn-outline-secondary" type="button" onclick="generateTempPassword()">
+              <i class="bi bi-shuffle me-1"></i>Generate
+            </button>
+          </div>
+          <div class="form-hint mt-1">They'll use this to log in the first time — tell them to change it after.</div>
+        </div>
+      </div>
+
+      <div id="customPermsBlock" class="mt-4">
+        <label class="form-label d-block">Which parts of the app can they use?</label>
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-register" checked>
+              <label class="form-check-label" for="perm-register">Register Lab</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-bulk">
+              <label class="form-check-label" for="perm-bulk">Bulk Import</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-directory" checked>
+              <label class="form-check-label" for="perm-directory">Onboarding Pipeline</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-tracker" checked>
+              <label class="form-check-label" for="perm-tracker">Daily Tracker</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-report">
+              <label class="form-check-label" for="perm-report">6 PM Report</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-docs">
+              <label class="form-check-label" for="perm-docs">Documents</label>
+            </div>
+          </div>
+        </div>
+        <label class="form-label d-block">What can they do with a lab's data?</label>
+        <div class="row g-2">
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-editLab" checked>
+              <label class="form-check-label" for="perm-editLab">Edit labs</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-deleteLab">
+              <label class="form-check-label" for="perm-deleteLab">Delete labs</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="form-check">
+              <input class="form-check-input perm-check" type="checkbox" id="perm-export">
+              <label class="form-check-label" for="perm-export">Export files</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-hint mt-2"><i class="bi bi-info-circle me-1"></i>Delete is off by default — turn it on only for people who should be able to remove a lab permanently.</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap mt-3">
+        <button class="btn btn-primary px-4" id="createUserBtn" onclick="createStaffUser()">
+          <i class="bi bi-person-check me-1"></i>Create User
+        </button>
+      </div>
+
+      <div id="newUserResult" class="mt-4" style="display:none"></div>
+    </div>
+
+    <div class="content-card">
+      <h5 class="section-heading mb-3"><i class="bi bi-people me-2"></i>Everyone with access</h5>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-primary">
+            <tr><th>Name</th><th>Email</th><th>Access Level</th><th>Added</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <tr><td colspan="5" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-hint mt-2">
+        <i class="bi bi-info-circle me-1"></i><strong>Remove access</strong> stops them from using the app,
+        but their login still exists in Firebase — for a full delete, remove it under
+        Firebase Console → Authentication too.
+      </p>
+    </div>
+  </div>
+
 </div><!-- /page-wrapper -->
 
 <!-- DETAIL MODAL -->
@@ -542,7 +689,7 @@
       </div>
       <div class="modal-body" id="modalBody"></div>
       <div class="modal-footer">
-        <button class="btn btn-warning" onclick="openEditLab(viewingLabId)">
+        <button class="btn btn-warning" id="modalEditBtn" onclick="openEditLab(viewingLabId)">
           <i class="bi bi-pencil-square me-1"></i>Edit details
         </button>
         <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -731,22 +878,22 @@
         <!-- SUMMARY CARDS -->
         <div class="row g-3 mb-4">
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-primary"><div><h6>Total Labs</h6><h2 id="anTotal">—</h2></div><i class="bi bi-building stat-icon"></i></div>
+            <div class="dash-card dc-blue"><div><h6>Total Labs</h6><h2 id="anTotal">—</h2></div><i class="bi bi-building stat-icon"></i></div>
           </div>
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-success"><div><h6>Live</h6><h2 id="anLive">—</h2></div><i class="bi bi-check-circle stat-icon"></i></div>
+            <div class="dash-card dc-green"><div><h6>Live</h6><h2 id="anLive">—</h2></div><i class="bi bi-check-circle stat-icon"></i></div>
           </div>
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-info text-dark"><div><h6>Onboarding</h6><h2 id="anOnboard">—</h2></div><i class="bi bi-arrow-repeat stat-icon"></i></div>
+            <div class="dash-card dc-teal"><div><h6>Onboarding</h6><h2 id="anOnboard">—</h2></div><i class="bi bi-arrow-repeat stat-icon"></i></div>
           </div>
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-danger"><div><h6>Hold</h6><h2 id="anHold">—</h2></div><i class="bi bi-pause-circle stat-icon"></i></div>
+            <div class="dash-card dc-amber"><div><h6>Hold</h6><h2 id="anHold">—</h2></div><i class="bi bi-pause-circle stat-icon"></i></div>
           </div>
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-secondary"><div><h6>Lost</h6><h2 id="anLost">—</h2></div><i class="bi bi-x-circle stat-icon"></i></div>
+            <div class="dash-card dc-gray"><div><h6>Lost</h6><h2 id="anLost">—</h2></div><i class="bi bi-x-circle stat-icon"></i></div>
           </div>
           <div class="col-6 col-md-4 col-xl-2">
-            <div class="dash-card bg-dark"><div><h6>Live Conversion</h6><h2 id="anLivePct">—</h2></div><i class="bi bi-graph-up stat-icon"></i></div>
+            <div class="dash-card dc-purple"><div><h6>Live Conversion</h6><h2 id="anLivePct">—</h2></div><i class="bi bi-graph-up stat-icon"></i></div>
           </div>
         </div>
 
@@ -852,6 +999,7 @@
 
 <!-- Firebase SDKs (compat version – works without bundler) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
