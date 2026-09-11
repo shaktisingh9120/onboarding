@@ -1,40 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flabs Login</title>
-<link rel="stylesheet" href="login.css">
+  <meta charset="UTF-8">
+  <title>Flabs Login</title>
+  <link rel="stylesheet" href="login.css">
 </head>
 <body>
 
 <div class="login-box">
-  <img src="logo.png" class="logo" alt="Flabs">
-  <h2>Log In</h2>
+  <img src="logo.png" class="logo">
+  <h2>Dashboard Access</h2>
 
-  <!-- Tab switcher -->
-  <div class="login-tabs">
-    <button type="button" class="login-tab active" id="tabUserBtn" onclick="switchLoginTab('user')">User</button>
-    <button type="button" class="login-tab" id="tabAdminBtn" onclick="switchLoginTab('admin')">Admin</button>
-  </div>
+  <input type="text" id="userId" placeholder="User ID">
+  <input type="password" id="password" placeholder="Password">
 
-  <p class="tab-hint" id="tabHint">Sign in with the login your admin gave you.</p>
-
-  <input type="email" id="loginEmail" placeholder="Email">
-  <input type="password" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter') login()">
-
-  <div class="forgot-row">
-    <a href="#" onclick="forgotPassword();return false;">Forgot password?</a>
-  </div>
-
-  <button type="button" class="btn-login" id="loginBtn" onclick="login()">Login</button>
+  <button type="button" onclick="login()">Login</button>
   <p id="error"></p>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script src="login.js"></script>
 </body>
 </html>
