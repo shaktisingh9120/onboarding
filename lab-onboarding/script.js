@@ -10,6 +10,25 @@ const storage   = firebase.storage();
 const labsCol   = db.collection("labs");
 const logsCol   = db.collection("daily_logs");
 const reportCol = db.collection("daily_reports");
+const usersCol  = db.collection("users");
+
+// ── Who's logged in, and what can they do? ──────────────────
+// The login page (outside this app) is responsible for setting these two
+// keys in sessionStorage after checking the person's credentials against
+// Firebase Auth + their role doc in the "users" collection. If a session
+// was started before roles existed (the old shared-password flow), there's
+// no role recorded — that's treated as Admin so nobody already using the
+// tool gets locked out; every account created from here on does get a role.
+const CURRENT_ROLE  = sessionStorage.getItem("userRole")  || "Admin";
+const CURRENT_EMAIL = sessionStorage.getItem("userEmail") || "";
+const IS_ADMIN = CURRENT_ROLE === "Admin";
+// Custom accounts carry a JSON permissions object set at login; Admin implicitly has all of it.
+const CURRENT_PERMS = (() => {
+  try { return JSON.parse(sessionStorage.getItem("userPerms") || "null"); }
+  catch { return null; }
+})();
+const can = key => IS_ADMIN || (CURRENT_PERMS && CURRENT_PERMS[key] === true);
+let users = [];
 
 // ── Onboarding pipeline: Assigned → Live ────────────────────
 const STAGES = [
@@ -71,6 +90,8 @@ const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
 
 // ── Boot ───────────────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
+  initTheme();
+  applyRoleRestrictions();
   setupDropZone();
   setupBulkZone();
   buildStageSelects();
@@ -79,12 +100,282 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("trackDate").value = today();
   listenToLabs();
   listenToLogs();
+  if (IS_ADMIN) listenToUsers();
   tickShiftBar();
   setInterval(tickShiftBar, 30000);
   setInterval(checkAssignedOverdue, 5 * 60000); // re-check every 5 min — a lab can cross 7 days with no data change
 });
 
+// ── Role-based access ────────────────────────────────────────
+// Two levels for now: Admin (everything) and Staff (day-to-day work —
+// register, bulk import, daily tracker, 6 PM report — but no deleting
+// labs, no exports, and the Manage Users tab doesn't exist for them at all).
+function applyRoleRestrictions() {
+  // Admin-only bits (Manage Users tab) — never granted via Custom permissions,
+  // deliberately, so a Custom user can never make themselves an Admin from the UI.
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.style.display = IS_ADMIN ? "" : "none";
+  });
+
+  // Tab-level access: hide whole nav items the account isn't permitted to open.
+  let firstAllowedTab = null;
+  document.querySelectorAll("[data-perm]").forEach(li => {
+    const key = li.getAttribute("data-perm");
+    const allowed = can(key);
+    li.style.display = allowed ? "" : "none";
+    if (allowed && !firstAllowedTab) firstAllowedTab = key;
+  });
+  // If Register Lab (the default landing tab) isn't allowed, land on whatever they do have.
+  if (!can("register") && firstAllowedTab) switchTab(firstAllowedTab);
+
+  // Action-level access, independent of which tabs are visible.
+  if (!can("export")) {
+    document.querySelectorAll(".btn-export").forEach(el => el.style.display = "none");
+  }
+  const modalEditBtn = document.getElementById("modalEditBtn");
+  if (modalEditBtn) modalEditBtn.style.display = can("editLab") ? "" : "none";
+
+  const pill = document.getElementById("whoamiPill");
+  if (pill) {
+    const label = sessionStorage.getItem("userName") || CURRENT_EMAIL || "Admin";
+    pill.innerHTML = `<i class="bi bi-person-circle me-1"></i>${esc(label)} <span class="whoami-role">${esc(CURRENT_ROLE)}</span>`;
+  }
+}
+
+// ── Dark / Light theme ───────────────────────────────────────
+// Preference lives in localStorage so it survives across sessions
+// (sessionStorage is used for login only). Charts re-render on
+// toggle since Chart.js bakes text/grid colours in at draw time.
+function initTheme() {
+  const saved = localStorage.getItem("flabsTheme")
+    || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  applyTheme(saved, false);
+}
+
+function applyTheme(theme, animate = true) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("flabsTheme", theme);
+  const btn = document.getElementById("themeToggleBtn");
+  if (btn) btn.innerHTML = theme === "dark"
+    ? `<i class="bi bi-sun-fill"></i>`
+    : `<i class="bi bi-moon-stars-fill"></i>`;
+  if (typeof Chart !== "undefined") {
+    Chart.defaults.color = theme === "dark" ? "#92a1b3" : "#4a5a68";
+    Chart.defaults.borderColor = theme === "dark" ? "#2a3442" : "#e8eef5";
+    if (animate) renderAnalysis(); // repaint charts with the new palette
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "light";
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  USER MANAGEMENT (admin-only)
+// ══════════════════════════════════════════════════════════════
+// Creating a user with the client SDK normally signs YOU out and signs you
+// in as the new person — Firebase's default auth() instance can only hold
+// one session. The standard workaround is a second, throwaway Firebase
+// "app" instance that does the create-and-sign-out, while your own session
+// on the main app instance is never touched.
+let secondaryApp = null;
+function getSecondaryAuth() {
+  if (!secondaryApp) {
+    secondaryApp = firebase.apps.find(a => a.name === "Secondary")
+      || firebase.initializeApp(firebaseConfig, "Secondary");
+  }
+  return secondaryApp.auth();
+}
+
+// Every permission key maps 1:1 to a tab or an action button elsewhere in the app.
+const PERM_KEYS = ["register","bulk","directory","tracker","report","docs","editLab","deleteLab","export"];
+
+function toggleCustomPerms() {
+  const isAdmin = document.getElementById("uRole").value === "Admin";
+  const block = document.getElementById("customPermsBlock");
+  block.style.opacity = isAdmin ? "0.4" : "1";
+  document.querySelectorAll(".perm-check").forEach(cb => cb.disabled = isAdmin);
+}
+
+function generateTempPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$";
+  let pw = "";
+  for (let i = 0; i < 10; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById("uPassword").value = pw;
+}
+
+async function createStaffUser() {
+  if (!IS_ADMIN) { showToast("Only Admins can create users", "danger"); return; }
+
+  const name     = document.getElementById("uName").value.trim();
+  const email    = document.getElementById("uEmail").value.trim();
+  const role     = document.getElementById("uRole").value; // "Admin" or "Custom"
+  const password = document.getElementById("uPassword").value;
+
+  if (!name)  { showToast("Enter their name", "danger"); return; }
+  if (!email) { showToast("Enter their email", "danger"); return; }
+  if (!password || password.length < 6) { showToast("Password needs at least 6 characters", "danger"); return; }
+
+  // Admin gets every permission implicitly; Custom stores exactly what's ticked.
+  const permissions = {};
+  PERM_KEYS.forEach(key => {
+    permissions[key] = role === "Admin" ? true : document.getElementById(`perm-${key}`).checked;
+  });
+
+  const btn = document.getElementById("createUserBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Creating...`;
+
+  try {
+    const secAuth = getSecondaryAuth();
+    const cred = await secAuth.createUserWithEmailAndPassword(email, password);
+    await usersCol.doc(cred.user.uid).set({
+      name, email, role, permissions,
+      createdAt: Date.now(),
+      createdBy: CURRENT_EMAIL || "admin"
+    });
+    await secAuth.signOut(); // tidy up the throwaway session — doesn't touch your own login
+
+    const grantedLabel = role === "Admin"
+      ? "Everything (Admin)"
+      : PERM_KEYS.filter(k => permissions[k]).map(k => PERM_LABELS[k]).join(", ") || "Nothing yet — edit their access below";
+
+    document.getElementById("newUserResult").style.display = "block";
+    document.getElementById("newUserResult").innerHTML = `
+      <div class="content-card" style="background:#f0fff4;border:1px solid #c3ecd0">
+        <h6 class="mb-2"><i class="bi bi-check-circle-fill text-success me-1"></i>User created — share these with them</h6>
+        <div class="row g-2">
+          <div class="col-md-4"><strong>Name:</strong> ${esc(name)}</div>
+          <div class="col-md-4"><strong>Login ID:</strong> ${esc(email)}</div>
+          <div class="col-md-4"><strong>Password:</strong> ${esc(password)}</div>
+        </div>
+        <div class="mt-2"><strong>Access granted:</strong> ${esc(grantedLabel)}</div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyCreds('${esc(name)}','${esc(email)}','${esc(password)}','${esc(grantedLabel)}')">
+          <i class="bi bi-clipboard me-1"></i>Copy to share
+        </button>
+        <p class="form-hint mt-2 mb-0">Send this over a private channel (WhatsApp/Slack DM, not a public channel) and ask them to change the password after their first login.</p>
+      </div>`;
+
+    ["uName","uEmail","uPassword"].forEach(id => document.getElementById(id).value = "");
+    showToast("✅ User created");
+  } catch (err) {
+    console.error(err);
+    let msg = err.message;
+    if (err.code === "auth/email-already-in-use") msg = "That email already has an account.";
+    if (err.code === "auth/operation-not-allowed") msg = "Email/Password sign-in isn't enabled yet — turn it on in Firebase Console → Authentication → Sign-in method.";
+    if (err.code === "auth/configuration-not-found") msg = "Authentication isn't turned on for this Firebase project yet — open Firebase Console → Authentication and click \"Get started\" first.";
+    showToast("❌ " + msg, "danger");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="bi bi-person-check me-1"></i>Create User`;
+  }
+}
+
+const PERM_LABELS = {
+  register: "Register Lab", bulk: "Bulk Import", directory: "Onboarding Pipeline",
+  tracker: "Daily Tracker", report: "6 PM Report", docs: "Documents",
+  editLab: "Edit labs", deleteLab: "Delete labs", export: "Export files"
+};
+
+function copyCreds(name, email, password, grantedLabel) {
+  const text = `Flabs Lab Onboarding — your login\nName: ${name}\nLogin ID: ${email}\nPassword: ${password}\nAccess: ${grantedLabel}\n\nPlease log in and change your password.`;
+  navigator.clipboard.writeText(text).then(() => showToast("Copied — paste it wherever you're sending it"));
+}
+
+function listenToUsers() {
+  usersCol.orderBy("createdAt", "desc").onSnapshot(snapshot => {
+    users = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderUsersTable();
+  }, err => console.error(err));
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById("usersTableBody");
+  if (!tbody) return;
+  if (!users.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No users added yet — create the first one above.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = users.map(u => {
+    const chips = u.role === "Admin"
+      ? `<span class="perm-chip perm-chip-admin">Everything</span>`
+      : (PERM_KEYS.filter(k => u.permissions && u.permissions[k])
+          .map(k => `<span class="perm-chip">${esc(PERM_LABELS[k])}</span>`).join("") || `<span class="text-muted">No access granted</span>`);
+    return `
+    <tr>
+      <td>${esc(u.name)}</td>
+      <td>${esc(u.email)}</td>
+      <td>
+        <span class="status-badge ${u.role === "Admin" ? "badge-status-active" : "badge-status-under-onboarding"} mb-1 d-inline-block">${esc(u.role)}</span>
+        <div class="d-flex flex-wrap gap-1">${chips}</div>
+      </td>
+      <td class="cell-sub">${u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-GB") : "—"}</td>
+      <td class="d-flex gap-1">
+        <button class="btn btn-sm btn-outline-primary" onclick="openEditPerms('${u.id}')" title="Change access"><i class="bi bi-sliders"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="removeUserAccess('${u.id}','${esc(u.name)}')" title="Remove access"><i class="bi bi-person-dash"></i></button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// Quick in-place access editor — same checkbox set as create, pre-filled from their current doc.
+function openEditPerms(uid) {
+  const u = users.find(x => x.id === uid);
+  if (!u) return;
+  const isAdmin = u.role === "Admin";
+  const rowsHtml = PERM_KEYS.map(k => `
+    <div class="col-6 col-md-4">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="ep-${k}" ${((u.permissions && u.permissions[k]) || isAdmin) ? "checked" : ""} ${isAdmin ? "disabled" : ""}>
+        <label class="form-check-label" for="ep-${k}">${esc(PERM_LABELS[k])}</label>
+      </div>
+    </div>`).join("");
+
+  document.getElementById("newUserResult").style.display = "block";
+  document.getElementById("newUserResult").innerHTML = `
+    <div class="content-card" style="border:1px solid var(--border-card)">
+      <h6 class="mb-3"><i class="bi bi-sliders me-1"></i>Access for ${esc(u.name)}</h6>
+      <div class="mb-3">
+        <select class="form-select w-auto d-inline-block" id="ep-role" onchange="document.querySelectorAll('#newUserResult .form-check-input').forEach(c=>c.disabled=this.value==='Admin')">
+          <option value="Custom" ${!isAdmin ? "selected" : ""}>Custom</option>
+          <option value="Admin" ${isAdmin ? "selected" : ""}>Admin — full access</option>
+        </select>
+      </div>
+      <div class="row g-2">${rowsHtml}</div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-sm btn-primary" onclick="savePerms('${uid}')"><i class="bi bi-check2 me-1"></i>Save changes</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('newUserResult').style.display='none'">Cancel</button>
+      </div>
+    </div>`;
+  document.getElementById("newUserResult").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function savePerms(uid) {
+  const role = document.getElementById("ep-role").value;
+  const permissions = {};
+  PERM_KEYS.forEach(k => { permissions[k] = role === "Admin" ? true : !!document.getElementById(`ep-${k}`).checked; });
+  try {
+    await usersCol.doc(uid).update({ role, permissions });
+    document.getElementById("newUserResult").style.display = "none";
+    showToast("✅ Access updated — it'll apply next time they log in (or on refresh if they're online now)");
+  } catch (err) {
+    showToast("❌ Error: " + err.message, "danger");
+  }
+}
+
+async function removeUserAccess(uid, name) {
+  if (!confirm(`Remove ${name}'s access to this app?`)) return;
+  try {
+    await usersCol.doc(uid).delete();
+    showToast("Access removed — remember to also disable their login in Firebase Console → Authentication if they should never sign in again.");
+  } catch (err) {
+    showToast("❌ Error: " + err.message, "danger");
+  }
+}
+
 function logout() {
+  if (firebase.auth) { firebase.auth().signOut().catch(() => {}); }
   sessionStorage.clear();
   window.location.href = "../index.html";
 }
@@ -147,6 +438,54 @@ const labById      = id  => labs.find(l => l.id === id);
 // A lab is overdue when its target go-live date has passed and it isn't Live yet.
 const labOverdue = lab => !isLive(lab) && lab.goLiveTarget && lab.goLiveTarget < today();
 
+// ── Onboarding health: stalled stages & upcoming go-lives ────
+// A lab is "stalled" when it's sat in its current stage longer than usual —
+// this is often a better early-warning signal than "assigned > 7 days",
+// since a lab can be moving fine right up until one stage quietly stalls.
+const STALL_ALERT_DAYS = 5;
+const DUE_SOON_DAYS    = 3;
+
+function stageEnteredOn(lab) {
+  const hist = lab.stageHistory || [];
+  const entry = [...hist].reverse().find(h => h.stage === (lab.stage || "Assigned"));
+  return (entry && entry.date) || lab.assignedOn || null;
+}
+
+function daysInStage(lab) {
+  const since = stageEnteredOn(lab);
+  return since ? daysBetween(since, today()) : 0;
+}
+
+const isStalled = lab => inOnboarding(lab) && daysInStage(lab) > STALL_ALERT_DAYS;
+
+// Go-live is coming up in the next few days and hasn't happened yet.
+const isDueSoon = lab => !isLive(lab) && lab.goLiveTarget
+  && lab.goLiveTarget >= today()
+  && daysBetween(today(), lab.goLiveTarget) <= DUE_SOON_DAYS;
+
+// ── Notes history ─────────────────────────────────────────────
+// The Notes field used to just overwrite itself. Now every distinct save
+// is kept as its own timestamped entry, so the detail modal can show the
+// full trail ("Rate list pending" on Monday, "Rate list received" on
+// Thursday) instead of only ever seeing the latest line.
+function appendNoteIfChanged(lab, newText) {
+  const hist = (lab.notesHistory || []).slice();
+  const last = hist[hist.length - 1];
+  if (newText && (!last || last.text !== newText)) {
+    hist.push({ text: newText, ts: Date.now() });
+  }
+  return hist;
+}
+
+// Matches the DD/MM/YYYY style pretty() already uses elsewhere, plus a time.
+function fmtTs(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const date = d.toLocaleDateString("en-GB");
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${date}, ${time}`;
+}
+
 // A blocked log stays blocked until someone changes its status — not just for one day.
 const openBlocked  = () => logs.filter(l => l.status === "blocked");
 const logsOn       = date => logs.filter(l => l.date === date);
@@ -161,6 +500,8 @@ function updateStats() {
   set("statHold",      labs.filter(l => l.status === "Hold").length);
   set("statLost",      labs.filter(l => l.status === "Lost").length);
   set("statOverdue",   labs.filter(labOverdue).length + overdueLogs().length);
+  set("statStalled",   labs.filter(isStalled).length);
+  set("statDueSoon",   labs.filter(isDueSoon).length);
 }
 
 // ── Assigned > 7 days notifications ─────────────────────────
@@ -230,8 +571,16 @@ document.addEventListener("click", e => {
 // Clicking any other filter control cancels it, so it never lingers
 // and produces a result the visible dropdowns don't explain.
 let onboardingQuickFilter = false;
+let stalledQuickFilter    = false;
+let dueSoonQuickFilter    = false;
+let overdueQuickFilter    = false;
 
-function clearOnboardingQuickFilter() { onboardingQuickFilter = false; }
+function clearOnboardingQuickFilter() {
+  onboardingQuickFilter = false;
+  stalledQuickFilter    = false;
+  dueSoonQuickFilter    = false;
+  overdueQuickFilter    = false;
+}
 
 function applyDashboardFilter(type) {
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -241,12 +590,15 @@ function applyDashboardFilter(type) {
   setVal("filterStage", "");
   setVal("filterStatus", "");
   setVal("filterPriority", "");
-  onboardingQuickFilter = false;
+  clearOnboardingQuickFilter();
 
   if (type === "live")        setVal("filterStage", "Live");
   else if (type === "hold")   setVal("filterStatus", "Hold");
   else if (type === "lost")   setVal("filterStatus", "Lost");
   else if (type === "onboarding") onboardingQuickFilter = true;
+  else if (type === "stalled")    stalledQuickFilter    = true;
+  else if (type === "duesoon")    dueSoonQuickFilter    = true;
+  else if (type === "overdue")    overdueQuickFilter    = true;
   // "total" leaves every filter cleared
 
   switchTab("directory");
@@ -271,7 +623,7 @@ function tickShiftBar() {
 }
 
 // ── Tabs ────────────────────────────────────────────────────
-const TABS = ["register", "bulk", "directory", "tracker", "report", "docs"];
+const TABS = ["register", "bulk", "directory", "tracker", "report", "docs", "users"];
 function switchTab(tab) {
   TABS.forEach(t => {
     const pane = document.getElementById("tab-" + t);
@@ -281,6 +633,7 @@ function switchTab(tab) {
   });
   if (tab === "report")  renderReport();
   if (tab === "tracker") renderTracker();
+  if (tab === "users")   renderUsersTable();
 }
 
 // ── Select builders ─────────────────────────────────────────
@@ -540,6 +893,8 @@ async function saveLab() {
 
   btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving to Firebase...`;
 
+  const notesText = document.getElementById("labNotes").value.trim();
+
   try {
     await docRef.set({
       name,
@@ -551,7 +906,8 @@ async function saveLab() {
       contact:      document.getElementById("labContact").value.trim(),
       email:        document.getElementById("labEmail").value.trim(),
       phone:        document.getElementById("labPhone").value.trim(),
-      notes:        document.getElementById("labNotes").value.trim(),
+      notes:        notesText,
+      notesHistory: notesText ? [{ text: notesText, ts: Date.now() }] : [],
       stage,
       assignedOn,
       goLiveTarget: document.getElementById("labGoLiveTarget").value || "",
@@ -618,6 +974,7 @@ async function advanceStage(labId, direction) {
 let editingLabId = null;
 
 function openEditLab(id) {
+  if (!can("editLab")) { showToast("You don't have edit access — ask your Admin", "danger"); return; }
   const l = labById(id);
   if (!l) { showToast("Lab not found", "danger"); return; }
   editingLabId = id;
@@ -707,6 +1064,7 @@ async function saveLabEdit() {
   const newStage   = val("eStage") || "Assigned";
   const assignedOn = val("eAssignedOn");
   const city       = val("eCity");
+  const notesText  = val("eNotes");
 
   try {
     await labsCol.doc(editingLabId).update({
@@ -720,7 +1078,8 @@ async function saveLabEdit() {
       contact:      val("eContact"),
       email:        val("eEmail"),
       phone:        val("ePhone"),
-      notes:        val("eNotes"),
+      notes:        notesText,
+      notesHistory: appendNoteIfChanged(lab, notesText),
       stage:        newStage,
       assignedOn,
       goLiveTarget: val("eGoLiveTarget"),
@@ -759,7 +1118,10 @@ function filteredLabs() {
     (!af || (af === "__none__" ? !l.assignee : l.assignee === af)) &&
     (!spf || (spf === "__none__" ? !l.salesPerson : l.salesPerson === spf)) &&
     (!nf || (l.name || "").toLowerCase().includes(nf)) &&
-    (!onboardingQuickFilter || inOnboarding(l)));
+    (!onboardingQuickFilter || inOnboarding(l)) &&
+    (!stalledQuickFilter    || isStalled(l)) &&
+    (!dueSoonQuickFilter    || isDueSoon(l)) &&
+    (!overdueQuickFilter    || labOverdue(l)));
 }
 
 // ── Directory ────────────────────────────────────────────────
@@ -781,21 +1143,24 @@ function renderDirectory() {
     const daysCell = days === null ? "—"
       : days < 0 ? `<span class="cell-sub">starts ${pretty(l.assignedOn)}</span>`
       : `<span class="days-pill">${days}d</span>`;
+    const stalled = isStalled(l);
+    const dueSoon = isDueSoon(l);
     return `
-    <tr class="${[labOverdue(l) ? "row-overdue" : "", l.status === "Hold" ? "row-hold" : ""].filter(Boolean).join(" ")}">
+    <tr class="${[labOverdue(l) ? "row-overdue" : "", l.status === "Hold" ? "row-hold" : "", stalled ? "row-stalled" : ""].filter(Boolean).join(" ")}">
       <td>${i+1}</td>
       <td>
         <strong>${esc(l.name)}</strong>
         <div class="cell-sub">${esc(l.city || "—")}${l.code ? " · " + esc(l.code) : ""}</div>
         <div class="mt-1">
           <span class="status-badge badge-status-${statusSlug(l.status)}">${l.status === "Hold" ? "⏸ " : ""}${esc(l.status || "—")}</span>
+          ${dueSoon ? `<span class="due-soon-pill" title="Go-live target is close"><i class="bi bi-flag-fill"></i>Due ${pretty(l.goLiveTarget)}</span>` : ""}
         </div>
         ${l.assignee
           ? `<span class="assignee-pill"><i class="bi bi-person-fill"></i>${esc(l.assignee)}</span>`
           : `<span class="assignee-pill is-none"><i class="bi bi-person-dash"></i>Unassigned</span>`}
       </td>
       <td style="min-width:170px">
-        <div class="stage-name">${esc(l.stage || "Assigned")}</div>
+        <div class="stage-name">${esc(l.stage || "Assigned")}${stalled ? `<span class="stalled-pill" title="No stage movement in ${daysInStage(l)} days"><i class="bi bi-exclamation-triangle-fill"></i>Stuck ${daysInStage(l)}d</span>` : ""}</div>
         <div class="stage-track"><div class="stage-fill ${isLive(l) ? "is-live" : ""}" style="width:${pct}%"></div></div>
         <div class="cell-sub">${pct}% · step ${stageIndex(l)+1}/${STAGES.length}</div>
       </td>
@@ -819,8 +1184,8 @@ function renderDirectory() {
       <td>
         <div class="d-flex gap-1">
           <button class="btn btn-sm btn-outline-primary" onclick="showDetail('${l.id}')" title="Journey & documents"><i class="bi bi-eye"></i></button>
-          <button class="btn btn-sm btn-outline-warning" onclick="openEditLab('${l.id}')" title="Edit lab details"><i class="bi bi-pencil-square"></i></button>
-          <button class="btn btn-sm btn-outline-danger"  onclick="deleteLab('${l.id}')" title="Delete"><i class="bi bi-trash"></i></button>
+          ${can("editLab")   ? `<button class="btn btn-sm btn-outline-warning" onclick="openEditLab('${l.id}')" title="Edit lab details"><i class="bi bi-pencil-square"></i></button>` : ""}
+          ${can("deleteLab") ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteLab('${l.id}')" title="Delete"><i class="bi bi-trash"></i></button>` : ""}
         </div>
       </td>
     </tr>`;
@@ -829,6 +1194,7 @@ function renderDirectory() {
 
 // ── Delete lab (and its logs) ────────────────────────────────
 async function deleteLab(id) {
+  if (!can("deleteLab")) { showToast("You don't have delete access — ask your Admin", "danger"); return; }
   if (!confirm("Delete this lab, its documents and its daily log history?")) return;
   try {
     const lab = labById(id);
@@ -1226,7 +1592,21 @@ function showDetail(id) {
       <div class="modal-field"><label>Email</label><span>${esc(l.email || "—")}</span></div>
       <div class="modal-field"><label>Registered</label><span>${created}</span></div>
     </div>
-    ${l.notes ? `<div class="alert alert-light border mb-3" style="font-size:13px"><strong>Notes:</strong> ${esc(l.notes)}</div>` : ""}
+
+    <h6 class="modal-sec"><i class="bi bi-sticky me-1"></i>Notes (${(l.notesHistory||[]).length} ${((l.notesHistory||[]).length===1)?"entry":"entries"})</h6>
+    <div id="notesListWrap">
+      ${(l.notesHistory && l.notesHistory.length)
+        ? l.notesHistory.map((n, idx) => ({ ...n, idx })).slice().reverse().map(n => `
+            <div class="day-row day-note" id="noteRow-${n.idx}">
+              <span class="day-status" style="min-width:auto">
+                ${fmtTs(n.ts)}${n.editedTs ? `<i class="bi bi-pencil-fill ms-1" style="font-size:9px;opacity:0.6" title="Edited ${fmtTs(n.editedTs)}"></i>` : ""}
+              </span>
+              <span class="day-act">${esc(n.text)}</span>
+              ${can("editLab")   ? `<button class="btn btn-sm btn-link p-0 note-edit-btn" onclick="startEditNote('${l.id}', ${n.idx})" title="Edit this note"><i class="bi bi-pencil"></i></button>` : ""}
+              ${can("deleteLab") ? `<button class="btn btn-sm btn-link p-0 note-delete-btn" onclick="deleteNote('${l.id}', ${n.idx})" title="Delete this note"><i class="bi bi-trash"></i></button>` : ""}
+            </div>`).join("")
+        : `<p class="text-muted text-center py-3">No notes added yet.</p>`}
+    </div>
 
     <h6 class="modal-sec"><i class="bi bi-signpost-split me-1"></i>Onboarding journey</h6>
     <div class="timeline">${timeline}</div>
@@ -1246,6 +1626,85 @@ function showDetail(id) {
       </div>`).join("") : `<p class="text-muted text-center py-3">No documents attached</p>`}
   `;
   new bootstrap.Modal(document.getElementById("detailModal")).show();
+}
+
+// ── Edit a single note entry in place ───────────────────────
+// Swaps that one row for a small inline textarea + Save/Cancel,
+// rather than reopening the whole edit-lab modal for one line.
+function startEditNote(labId, idx) {
+  if (!can("editLab")) { showToast("You don't have edit access — ask your Admin", "danger"); return; }
+  const lab = labById(labId);
+  const row = document.getElementById(`noteRow-${idx}`);
+  if (!lab || !row) return;
+  const entry = (lab.notesHistory || [])[idx];
+  if (!entry) return;
+
+  row.outerHTML = `
+    <div class="day-row day-note-editing" id="noteRow-${idx}">
+      <div class="w-100">
+        <textarea class="form-control form-control-sm mb-2" id="noteEditBox-${idx}" rows="2">${esc(entry.text)}</textarea>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-primary" onclick="saveEditNote('${labId}', ${idx})"><i class="bi bi-check-circle me-1"></i>Save</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="showDetail('${labId}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById(`noteEditBox-${idx}`)?.focus();
+}
+
+async function saveEditNote(labId, idx) {
+  const lab = labById(labId);
+  const box = document.getElementById(`noteEditBox-${idx}`);
+  if (!lab || !box) return;
+  const newText = box.value.trim();
+  if (!newText) { showToast("Note can't be empty", "danger"); return; }
+
+  const history = (lab.notesHistory || []).slice();
+  if (!history[idx]) return;
+  history[idx] = { ...history[idx], text: newText, editedTs: Date.now() };
+
+  // Mutate the local copy first so the modal re-render below doesn't have to
+  // race the Firestore listener — it just reflects what we're about to save.
+  lab.notesHistory = history;
+  lab.notes = history[history.length - 1].text;
+
+  try {
+    await labsCol.doc(labId).update({
+      notesHistory: history,
+      notes: lab.notes
+    });
+    showToast("✅ Note updated");
+    showDetail(labId);
+  } catch (err) {
+    showToast("❌ Error: " + err.message, "danger");
+  }
+}
+
+async function deleteNote(labId, idx) {
+  if (!can("deleteLab")) { showToast("You don't have delete access — ask your Admin", "danger"); return; }
+  const lab = labById(labId);
+  if (!lab) return;
+  const history = (lab.notesHistory || []).slice();
+  if (!history[idx]) return;
+  if (!confirm("Delete this note? This can't be undone.")) return;
+
+  history.splice(idx, 1);
+
+  // Mutate the local copy first so the re-render below is instant, same
+  // reasoning as saveEditNote — don't wait on the Firestore listener.
+  lab.notesHistory = history;
+  lab.notes = history.length ? history[history.length - 1].text : "";
+
+  try {
+    await labsCol.doc(labId).update({
+      notesHistory: history,
+      notes: lab.notes
+    });
+    showToast("🗑️ Note deleted");
+    showDetail(labId);
+  } catch (err) {
+    showToast("❌ Error: " + err.message, "danger");
+  }
 }
 
 // ── Docs tab ─────────────────────────────────────────────────
@@ -2017,7 +2476,9 @@ function anGroupCounts(list, field) {
     .sort((a, b) => b.total - a.total);
 }
 
-const AN_COLORS = { live: "#198754", onboarding: "#17a2b8", hold: "#dc3545", lost: "#6c757d" };
+// Same hues as the .dc-* stat-card variants in style.css, so the dashboard
+// cards, the pipeline badges and these charts all read as one colour system.
+const AN_COLORS = { live: "#2fbf71", onboarding: "#4f8ef7", hold: "#f5a524", lost: "#8a97a3" };
 
 function renderAnalysis() {
   if (!document.getElementById("analysisModal") || typeof Chart === "undefined") return;
@@ -2099,7 +2560,7 @@ function anRenderDonut(overall) {
         data: [overall.live, overall.onboarding, overall.hold, overall.lost],
         backgroundColor: [AN_COLORS.live, AN_COLORS.onboarding, AN_COLORS.hold, AN_COLORS.lost],
         borderWidth: 2,
-        borderColor: "#fff"
+        borderColor: document.documentElement.getAttribute("data-theme") === "dark" ? "#1a212c" : "#fff"
       }]
     },
     options: {
@@ -2144,8 +2605,8 @@ function anRenderTrend(filtered) {
       datasets: [{
         label: "Labs Assigned",
         data: sortedMonths.map(m => months[m]),
-        borderColor: "#0f4c81",
-        backgroundColor: "rgba(15,76,129,0.15)",
+        borderColor: document.documentElement.getAttribute("data-theme") === "dark" ? "#4fa3ff" : "#0f4c81",
+        backgroundColor: document.documentElement.getAttribute("data-theme") === "dark" ? "rgba(79,163,255,0.18)" : "rgba(15,76,129,0.15)",
         fill: true,
         tension: 0.3,
         pointRadius: 3
