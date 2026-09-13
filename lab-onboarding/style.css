@@ -1059,6 +1059,38 @@ html[data-theme="dark"] .day-note-editing { background: rgba(30,144,255,0.1); }
 
 .xl-scope-count { font-size: 11.5px; color: #7d8a96; line-height: 1.4; }
 
+.xl-fields-toggle { float: right; font-size: 12px; font-weight: 400; }
+.xl-fields-toggle a { color: #1e90ff; text-decoration: none; }
+.xl-fields-toggle a:hover { text-decoration: underline; }
+
+.xl-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 10px;
+  margin-bottom: 14px;
+}
+.xl-field-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid #e3ebf3;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #33424f;
+  transition: background 0.15s, border-color 0.15s;
+}
+.xl-field-item:hover { background: #f6f9fc; border-color: #1e90ff; }
+.xl-field-item:has(.form-check-input:checked) { background: #e8f0fe; border-color: #1e90ff; }
+.xl-field-item .form-check-input { margin: 0; flex-shrink: 0; }
+html[data-theme="dark"] .xl-field-item { border-color: var(--border-soft); color: var(--text-body); }
+html[data-theme="dark"] .xl-field-item:hover { background: var(--bg-soft); }
+
+@media (max-width: 480px) {
+  .xl-field-grid { grid-template-columns: 1fr; }
+}
+
 /* ============================================================
    ONBOARDING ANALYSIS DASHBOARD
    ============================================================ */
