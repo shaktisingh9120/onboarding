@@ -827,10 +827,23 @@
           </span>
         </label>
 
+        <h6 class="modal-sec">
+          <i class="bi bi-table me-1"></i>Labs sheet — fields to include
+          <span class="xl-fields-toggle">
+            <a href="#" onclick="setAllXlFields(true); return false;">All</a> ·
+            <a href="#" onclick="setAllXlFields(false); return false;">None</a>
+          </span>
+        </h6>
+        <p class="form-hint mb-2">
+          Every export includes the <strong>Labs</strong> sheet, one row per lab. Pick which columns go in —
+          untick what you don't need, e.g. drop <strong>Notes</strong> or <strong>Phone</strong> for a shorter,
+          shareable sheet.
+        </p>
+        <div class="xl-field-grid" id="xlFieldGrid"></div>
+
         <h6 class="modal-sec"><i class="bi bi-layers me-1"></i>Extra sheets</h6>
         <p class="form-hint mb-2">
-          The <strong>Labs</strong> sheet always goes in — one row per lab with its notes, latest remark
-          and open blocker reasons already on it. Tick these only if you need the detail behind those columns.
+          Tick these only if you need the detail behind the Labs sheet's summary columns.
         </p>
         <label class="xl-opt">
           <input class="form-check-input" type="checkbox" id="xlLogs" checked>
