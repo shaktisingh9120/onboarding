@@ -2218,12 +2218,91 @@ function makeSheet(rows, widths, fmt = {}) {
   return ws;
 }
 
+// Every column the Labs sheet can carry. `get(l, ctx, i)` returns the cell
+// value for lab `l` at row index `i`; `ctx` is the per-lab bundle of
+// derived data (mine/blocked/last/days) computed once in exportExcel so
+// fields don't each recompute it. `date`/`fmt` drive column number-formats,
+// applied by the *selected* column's position — see buildLabsSheet below.
+const LAB_FIELDS = [
+  { id: "idx",           label: "#",                  width: 5,  get: (l, ctx, i) => i + 1 },
+  { id: "name",          label: "Lab Name",           width: 30, get: l => l.name || "" },
+  { id: "code",          label: "Lab Code",           width: 12, get: l => l.code || "" },
+  { id: "city",          label: "City",               width: 16, get: l => l.city || "" },
+  { id: "assignee",      label: "Assignee",           width: 16, get: l => l.assignee || "Unassigned" },
+  { id: "salesPerson",   label: "Sales Person",       width: 16, get: l => l.salesPerson || "" },
+  { id: "status",        label: "Status",             width: 10, get: l => l.status || "" },
+  { id: "priority",      label: "Priority",           width: 10, get: l => l.priority || "" },
+  { id: "stage",         label: "Current Stage",      width: 24, get: l => l.stage || "Assigned" },
+  { id: "step",          label: "Step",               width: 10, get: l => `${stageIndex(l) + 1} of ${STAGES.length}` },
+  { id: "percent",       label: "% Complete",         width: 12, get: l => stagePercent(l) / 100, fmt: "0%" },
+  { id: "assignedOn",    label: "Assigned On",        width: 13, get: l => xlDate(l.assignedOn), date: true },
+  { id: "goLiveTarget",  label: "Go-Live Target",     width: 14, get: l => xlDate(l.goLiveTarget), date: true },
+  { id: "goLiveOn",      label: "Went Live",          width: 13, get: l => xlDate(l.goLiveOn), date: true },
+  { id: "daysInOnboarding", label: "Days in Onboarding", width: 17, get: (l, ctx) => ctx.days === "" ? "" : ctx.days },
+  { id: "daysOverdue",   label: "Days Overdue",       width: 13, get: (l, ctx) => labOverdue(l) ? daysBetween(l.goLiveTarget, ctx.D) : "" },
+  { id: "openBlockers",  label: "Open Blockers",      width: 14, get: (l, ctx) => ctx.blocked.length },
+  { id: "blockerReasons",label: "Blocker Reasons",    width: 34, get: (l, ctx) => [...new Set(ctx.blocked.map(x => x.blocker).filter(Boolean))].join("; ") },
+  { id: "logEntries",    label: "Log Entries",        width: 11, get: (l, ctx) => ctx.mine.length },
+  { id: "lastActivityOn",label: "Last Activity On",   width: 15, get: (l, ctx) => ctx.last ? xlDate(ctx.last.date) : "", date: true },
+  { id: "latestRemark",  label: "Latest Remark",      width: 46, get: (l, ctx) => ctx.last ? `${LOG_STATUS[ctx.last.status]} — ${ctx.last.activity}` : "" },
+  { id: "contact",       label: "Contact Person",     width: 20, get: l => l.contact || "" },
+  { id: "email",         label: "Email",              width: 26, get: l => l.email || "" },
+  { id: "phone",         label: "Phone",              width: 15, get: l => l.phone || "" },
+  { id: "documents",     label: "Documents",          width: 11, get: l => (l.files || []).length },
+  { id: "notes",         label: "Notes / Remarks",    width: 50, get: l => l.notes || "" },
+];
+
+const XL_FIELDS_KEY = "flabsXlFieldSelection";
+
+function loadXlFieldSelection() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(XL_FIELDS_KEY) || "null");
+    if (saved && typeof saved === "object") return saved;
+  } catch (e) { /* ignore bad saved data, fall through to defaults */ }
+  return null;
+}
+
+function saveXlFieldSelection() {
+  const sel = {};
+  LAB_FIELDS.forEach(f => { sel[f.id] = !!document.getElementById(`fld-${f.id}`)?.checked; });
+  localStorage.setItem(XL_FIELDS_KEY, JSON.stringify(sel));
+}
+
+function renderXlFieldGrid() {
+  const grid = document.getElementById("xlFieldGrid");
+  if (!grid || grid.dataset.built) return;
+  const saved = loadXlFieldSelection();
+  grid.innerHTML = LAB_FIELDS.map(f => {
+    const checked = saved ? (saved[f.id] !== false) : true; // default: everything on
+    return `
+      <label class="xl-field-item">
+        <input class="form-check-input" type="checkbox" id="fld-${f.id}" ${checked ? "checked" : ""} onchange="saveXlFieldSelection()">
+        <span>${f.label}</span>
+      </label>`;
+  }).join("");
+  grid.dataset.built = "1";
+}
+
+function setAllXlFields(on) {
+  LAB_FIELDS.forEach(f => {
+    const box = document.getElementById(`fld-${f.id}`);
+    if (box) box.checked = on;
+  });
+  saveXlFieldSelection();
+}
+
+function selectedXlFields() {
+  const chosen = LAB_FIELDS.filter(f => document.getElementById(`fld-${f.id}`)?.checked);
+  return chosen.length ? chosen : LAB_FIELDS; // never export a headerless sheet
+}
+
 function openExcelExport() {
   const shown = filteredLabs().length;
   document.getElementById("xlScopeFiltered").parentElement.querySelector(".xl-scope-count").textContent =
     `${shown} lab${shown === 1 ? "" : "s"} currently showing in the pipeline`;
   document.getElementById("xlScopeAll").parentElement.querySelector(".xl-scope-count").textContent =
     `${labs.length} lab${labs.length === 1 ? "" : "s"} registered in total`;
+  renderXlFieldGrid();
   new bootstrap.Modal(document.getElementById("excelModal")).show();
 }
 
@@ -2243,55 +2322,24 @@ async function exportExcel() {
     const wb = XLSX.utils.book_new();
     const D  = today();
 
-    // ── Sheet 1: every lab on one row, remarks included ──────
-    const labRows = [[
-      "#","Lab Name","Lab Code","City","Assignee","Sales Person","Status","Priority",
-      "Current Stage","Step","% Complete",
-      "Assigned On","Go-Live Target","Went Live","Days in Onboarding","Days Overdue",
-      "Open Blockers","Blocker Reasons",
-      "Log Entries","Last Activity On","Latest Remark",
-      "Contact Person","Email","Phone","Documents","Notes / Remarks"
-    ]];
+    // ── Sheet 1: every lab on one row — columns per the user's field pick ──
+    const fields  = selectedXlFields();
+    const labRows = [fields.map(f => f.label)];
+    const widths  = fields.map(f => f.width);
+    const fmt     = {};
+    fields.forEach((f, col) => { if (f.fmt) fmt[col] = f.fmt; else if (f.date) fmt[col] = "dd/mm/yyyy"; });
 
     scope.forEach((l, i) => {
       const mine    = scopedLogs.filter(x => x.labId === l.id);
       const blocked = mine.filter(x => x.status === "blocked");
       const last    = mine.slice().sort((a,b) => b.date.localeCompare(a.date))[0];
       const days    = l.assignedOn ? daysBetween(l.assignedOn, isLive(l) && l.goLiveOn ? l.goLiveOn : D) : "";
+      const ctx     = { mine, blocked, last, days, D };
 
-      labRows.push([
-        i + 1,
-        l.name || "",
-        l.code || "",
-        l.city || "",
-        l.assignee || "Unassigned",
-        l.salesPerson || "",
-        l.status || "",
-        l.priority || "",
-        l.stage || "Assigned",
-        `${stageIndex(l) + 1} of ${STAGES.length}`,
-        stagePercent(l) / 100,
-        xlDate(l.assignedOn),
-        xlDate(l.goLiveTarget),
-        xlDate(l.goLiveOn),
-        days === "" ? "" : days,
-        labOverdue(l) ? daysBetween(l.goLiveTarget, D) : "",
-        blocked.length,
-        [...new Set(blocked.map(x => x.blocker).filter(Boolean))].join("; "),
-        mine.length,
-        last ? xlDate(last.date) : "",
-        last ? `${LOG_STATUS[last.status]} — ${last.activity}` : "",
-        l.contact || "",
-        l.email || "",
-        l.phone || "",
-        (l.files || []).length,
-        l.notes || ""
-      ]);
+      labRows.push(fields.map(f => f.get(l, ctx, i)));
     });
 
-    XLSX.utils.book_append_sheet(wb, makeSheet(labRows,
-      [5,30,12,16,16,16,10,10,24,10,12,13,14,13,17,13,14,34,11,15,46,20,26,15,11,50],
-      { 11:"dd/mm/yyyy", 12:"dd/mm/yyyy", 13:"dd/mm/yyyy", 19:"dd/mm/yyyy", 10:"0%" }), "Labs");
+    XLSX.utils.book_append_sheet(wb, makeSheet(labRows, widths, fmt), "Labs");
 
     // ── Sheet 2: the daily remarks behind those numbers ──────
     if (want("xlLogs")) {
