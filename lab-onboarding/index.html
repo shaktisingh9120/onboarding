@@ -857,6 +857,21 @@
           <input class="form-check-input" type="checkbox" id="xlJourney">
           <span><strong>Stage Journey</strong><span class="xl-scope-count">Assigned → Live stage by stage, with days spent in each</span></span>
         </label>
+        <label class="xl-opt xl-opt-expand">
+          <input class="form-check-input" type="checkbox" id="xlSalesMonthly" checked>
+          <span><strong>Sales Person Monthly</strong><span class="xl-scope-count">Labs each sales person brought in per month, split by Live / Onboarding / Hold / Lost, plus lab names and their latest remark</span></span>
+        </label>
+        <div class="xl-month-range">
+          <div>
+            <label class="form-label">From month <span class="text-muted">(optional)</span></label>
+            <input type="month" class="form-control form-control-sm" id="xlMonthFrom">
+          </div>
+          <div>
+            <label class="form-label">To month <span class="text-muted">(optional)</span></label>
+            <input type="month" class="form-control form-control-sm" id="xlMonthTo">
+          </div>
+          <div class="xl-month-hint"><i class="bi bi-info-circle me-1"></i>Leave both blank to include every month.</div>
+        </div>
         <label class="xl-opt">
           <input class="form-check-input" type="checkbox" id="xlDocs">
           <span><strong>Documents</strong><span class="xl-scope-count">File names, types and download links</span></span>
@@ -958,6 +973,16 @@
           <div class="an-chart-wrap"><canvas id="anChartSales"></canvas></div>
           <div class="table-responsive mt-3">
             <table class="table table-sm table-bordered table-hover align-middle" id="anTableSales"></table>
+          </div>
+        </div>
+
+        <!-- SALES PERSON — MONTH-WISE INTAKE -->
+        <div class="content-card mb-4">
+          <h5 class="section-heading mb-3"><i class="bi bi-calendar3 me-2"></i>Sales Person — Monthly Intake</h5>
+          <p class="form-hint mb-3">How many labs each sales person brought in each month, and where those labs stand right now — hover any point to see the lab names behind it.</p>
+          <div class="an-chart-wrap an-chart-wrap-lg"><canvas id="anChartSalesMonthly"></canvas></div>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm table-bordered table-hover align-middle" id="anTableSalesMonthly"></table>
           </div>
         </div>
 
