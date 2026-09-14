@@ -2411,7 +2411,29 @@ async function exportExcel() {
       XLSX.utils.book_append_sheet(wb, makeSheet(rows, [28,16,24,10,13,14,13], { 4:"dd/mm/yyyy" }), "Stage Journey");
     }
 
-    // ── Sheet 5: what's on file, with the download links ─────
+    // ── Sheet 5: sales-person intake, month by month ─────────
+    if (want("xlSalesMonthly")) {
+      const mFrom = document.getElementById("xlMonthFrom")?.value || "";
+      const mTo   = document.getElementById("xlMonthTo")?.value   || "";
+      const monthScope = scope.filter(l => {
+        if (!l.assignedOn) return false;
+        const m = l.assignedOn.slice(0, 7);
+        if (mFrom && m < mFrom) return false;
+        if (mTo   && m > mTo)   return false;
+        return true;
+      });
+
+      const rows = [["Sales Person","Month","Total Assigned","Live","Under Onboarding","Hold","Lost","Lab Names","Remarks"]];
+      anSalesMonthly(monthScope, scopedLogs).forEach(r => rows.push([
+        r.salesPerson, monthLabel(r.month), r.total, r.live, r.onboarding, r.hold, r.lost,
+        r.labs.map(x => x.name).join("; "),
+        r.labs.map(x => `${x.name} [${x.bucket}]: ${x.remark}`).join(" | ")
+      ]));
+      if (rows.length === 1) rows.push(["No labs with an Assigned On date in this range", "", "", "", "", "", "", "", ""]);
+      XLSX.utils.book_append_sheet(wb, makeSheet(rows, [20,14,14,10,16,10,10,34,60], {}), "Sales Person Monthly");
+    }
+
+    // ── Sheet 6: what's on file, with the download links ─────
     if (want("xlDocs")) {
       const rows = [["Lab","Assignee","Document Type","File Name","Size (KB)","Link"]];
       scope.forEach(l => (l.files || []).forEach(f => rows.push([
@@ -2513,6 +2535,46 @@ function anBucketCounts(list) {
   };
 }
 
+// Sales-person × month breakdown: "how many labs came in each month, and
+// of those, how many are now Live / Onboarding / Hold / Lost". Bucketed by
+// assignedOn (the month the lab actually landed with that sales person),
+// but the status buckets reflect *current* state, same as everywhere else.
+// Every row also carries per-lab detail (name + bucket + latest remark) so
+// both the chart tooltip and the Excel sheet can show names, not just counts.
+function anSalesMonthly(list, logList) {
+  const scopedLogs = logList || logs;
+  const rows = {}; // "salesPerson||month" -> row
+  list.forEach(l => {
+    if (!l.assignedOn) return;
+    const sp = (l.salesPerson || "").trim() || "Unassigned";
+    const m  = l.assignedOn.slice(0, 7); // YYYY-MM
+    const key = sp + "||" + m;
+    const row = (rows[key] ||= {
+      salesPerson: sp, month: m, total: 0, live: 0, onboarding: 0, hold: 0, lost: 0, labs: []
+    });
+
+    let bucket = "Other";
+    if (isLive(l))            { bucket = "Live";       row.live++; }
+    else if (inOnboarding(l)) { bucket = "Onboarding";  row.onboarding++; }
+    else if (l.status === "Hold") { bucket = "Hold";    row.hold++; }
+    else if (l.status === "Lost") { bucket = "Lost";    row.lost++; }
+    row.total++;
+
+    const mine   = scopedLogs.filter(x => x.labId === l.id);
+    const last   = mine.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+    const remark = last ? `${LOG_STATUS[last.status] || ""}: ${last.activity || ""}`.trim() : (l.notes || "");
+    row.labs.push({ name: l.name || "Unnamed", bucket, remark: remark || "—" });
+  });
+  return Object.values(rows).sort((a, b) => a.salesPerson.localeCompare(b.salesPerson) || a.month.localeCompare(b.month));
+}
+
+// Trim a list of names down to something a tooltip or cell can hold.
+function fmtNameList(names, max = 4) {
+  if (!names.length) return "—";
+  if (names.length <= max) return names.join(", ");
+  return names.slice(0, max).join(", ") + ` +${names.length - max} more`;
+}
+
 function anGroupCounts(list, field) {
   const groups = {};
   list.forEach(l => {
@@ -2551,6 +2613,110 @@ function renderAnalysis() {
   anRenderTable("anTableAssignee", byAssignee, "Assignee");
   anRenderDonut(overall);
   anRenderTrend(filtered);
+  anRenderSalesMonthly(filtered);
+}
+
+// Month-wise line chart, one line per sales person — answers "how many
+// labs did each sales person bring in, month by month". Only counts the
+// month a lab was assigned (not its current status), so it's a clean
+// intake trend; the table underneath adds the Live/Onboarding/Hold/Lost split.
+function anRenderSalesMonthly(filtered) {
+  const rows = anSalesMonthly(filtered);
+
+  const canvas = document.getElementById("anChartSalesMonthly");
+  if (canvas) {
+    if (anCharts.salesMonthly) anCharts.salesMonthly.destroy();
+
+    if (!rows.length) {
+      anCharts.salesMonthly = null;
+    } else {
+      const months = [...new Set(rows.map(r => r.month))].sort();
+      const people = [...new Set(rows.map(r => r.salesPerson))].sort();
+      const palette = ["#0f4c81","#2fbf71","#f5a524","#e05263","#4f8ef7","#8a5cf6","#20c0c0","#c77b1f","#8a97a3"];
+      const dark = document.documentElement.getAttribute("data-theme") === "dark";
+
+      const byKey = {};
+      rows.forEach(r => { byKey[r.salesPerson + "||" + r.month] = r; });
+
+      anCharts.salesMonthly = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: {
+          labels: months.map(monthLabel),
+          datasets: people.map((p, i) => {
+            const color = palette[i % palette.length];
+            return {
+              label: p,
+              data: months.map(m => (byKey[p + "||" + m] || {}).total || 0),
+              borderColor: color,
+              backgroundColor: color,
+              pointBackgroundColor: color,
+              pointBorderColor: dark ? "#1a212c" : "#fff",
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: false
+            };
+          })
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "nearest", intersect: true },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, padding: 16, font: { size: 12 } }
+            },
+            tooltip: {
+              backgroundColor: dark ? "rgba(26,33,44,0.97)" : "rgba(15,23,35,0.94)",
+              titleColor: "#fff",
+              bodyColor: "#e7edf5",
+              titleFont: { size: 13, weight: "600" },
+              bodyFont: { size: 12 },
+              padding: 12,
+              cornerRadius: 10,
+              displayColors: true,
+              boxPadding: 4,
+              caretSize: 6,
+              callbacks: {
+                title: items => items.length ? `${items[0].dataset.label} — ${items[0].label}` : "",
+                label: ctx => {
+                  const month = months[ctx.dataIndex];
+                  const row = byKey[ctx.dataset.label + "||" + month];
+                  if (!row || !row.total) return "No labs assigned this month";
+                  const byBucket = b => row.labs.filter(x => x.bucket === b).map(x => x.name);
+                  const lines = [`Total assigned: ${row.total}`];
+                  if (row.live)       lines.push(`🟢 Live (${row.live}): ${fmtNameList(byBucket("Live"))}`);
+                  if (row.onboarding) lines.push(`🔵 Onboarding (${row.onboarding}): ${fmtNameList(byBucket("Onboarding"))}`);
+                  if (row.hold)       lines.push(`🟠 Hold (${row.hold}): ${fmtNameList(byBucket("Hold"))}`);
+                  if (row.lost)       lines.push(`⚪ Lost (${row.lost}): ${fmtNameList(byBucket("Lost"))}`);
+                  return lines;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: dark ? "rgba(255,255,255,0.06)" : "rgba(15,23,35,0.06)" } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+  }
+
+  anRenderTable("anTableSalesMonthly", rows.map(r => ({
+    name: `${r.salesPerson} — ${monthLabel(r.month)}`,
+    total: r.total, live: r.live, onboarding: r.onboarding, hold: r.hold, lost: r.lost
+  })), "Sales Person / Month");
+}
+
+// "2026-05" -> "May 2026"
+function monthLabel(m) {
+  const [y, mo] = m.split("-");
+  const d = new Date(Number(y), Number(mo) - 1, 1);
+  return d.toLocaleString("en-US", { month: "short", year: "numeric" });
 }
 
 function anRenderBarChart(canvasId, groups) {
