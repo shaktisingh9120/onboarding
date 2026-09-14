@@ -1106,17 +1106,59 @@ html[data-theme="dark"] .xl-field-item:hover { background: var(--bg-soft); }
 .an-chart-wrap-sm { height: 280px; }
 
 #anTableSales thead th,
-#anTableAssignee thead th {
+#anTableAssignee thead th,
+#anTableSalesMonthly thead th {
   background: #e8f0fe;
   color: #0f4c81;
   font-size: 13px;
 }
-#anTableSales td, #anTableAssignee td { font-size: 13.5px; }
+#anTableSales td, #anTableAssignee td, #anTableSalesMonthly td { font-size: 13.5px; }
 
 @media (max-width: 768px) {
   .an-chart-wrap { height: 260px; }
   .an-chart-wrap-sm { height: 240px; }
 }
+
+/* Sales Person — Monthly Intake card: a touch taller (legend needs room)
+   and a subtle inset so it reads as "the" chart to hover on. */
+.an-chart-wrap-lg {
+  height: 380px;
+  background: linear-gradient(180deg, rgba(15,76,129,0.03), transparent 60%);
+  border-radius: 12px;
+  padding: 10px 6px 0;
+}
+html[data-theme="dark"] .an-chart-wrap-lg {
+  background: linear-gradient(180deg, rgba(79,163,255,0.06), transparent 60%);
+}
+@media (max-width: 768px) {
+  .an-chart-wrap-lg { height: 300px; }
+}
+
+/* Excel export modal — month-range sub-panel under the Sales Person
+   Monthly checkbox, visually nested so it reads as "options for that row". */
+.xl-opt-expand { margin-bottom: 0; }
+.xl-month-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 4px 0 14px 30px;
+  padding: 10px 12px;
+  background: #f4f7fb;
+  border: 1px dashed #c9d6e6;
+  border-radius: 8px;
+}
+.xl-month-range > div:not(.xl-month-hint) { min-width: 140px; }
+.xl-month-hint {
+  font-size: 12px;
+  color: #6b7a8c;
+  flex-basis: 100%;
+}
+html[data-theme="dark"] .xl-month-range {
+  background: rgba(255,255,255,0.03);
+  border-color: var(--border-soft);
+}
+html[data-theme="dark"] .xl-month-hint { color: #92a1b3; }
 
 /* ===== DARK MODE — remaining bits ===== */
 html[data-theme="dark"] .notif-badge { border-color: var(--bg-header); }
