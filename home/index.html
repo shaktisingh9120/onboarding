@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Data Tools Dashboard</title>
+  <title>Flabs Admin Dashboard</title>
   <link rel="stylesheet" href="home.css">
 
   <!-- LOGIN PROTECTION -->
@@ -14,74 +14,124 @@
 </head>
 <body>
 
-<header class="top-header">
-  <div class="brand">
-    <img src="logo.png" class="brand-logo" alt="Flabs">
-  </div>
+<div class="app-shell">
 
-  <!-- LOGOUT BUTTON -->
-  <button class="logout-btn" onclick="logout()">Logout</button>
-</header>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-icon" title="Dashboard">
+      <img src="logo.png" class="sidebar-logo" alt="Flabs">
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../lab-onboarding/index.html" class="nav-icon" title="Lab Onboarding">🏥</a>
+      <a href="../duplicate-tool/index.html" class="nav-icon" title="Duplicate Tool">📄</a>
+      <a href="../test-matching/index.html" class="nav-icon" title="Test Matching">🔍</a>
+      <a href="../image-tool/index.html" class="nav-icon" title="Image Toolkit">🖼️</a>
+    </nav>
+    <button class="logout-btn" onclick="logout()" title="Logout">⇥</button>
+  </aside>
 
-<div class="dashboard">
-  <h1>🔵 Data Processing Tools</h1>
-  <p>Select a module to continue</p>
+  <!-- Main -->
+  <main class="main">
 
-  <div class="cards">
+    <div class="topbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="moduleSearch" placeholder="Search modules by name..." oninput="filterModules()">
+      </div>
+      <div class="topbar-right">
+        <span class="brand-name">Flabs Admin Dashboard</span>
+      </div>
+    </div>
 
-    <!-- Duplicate Tool -->
-    <a href="../duplicate-tool/index.html" class="card">
-      <div class="icon">📄</div>
-      <h2>Duplicate Tool</h2>
-      <p>
-        Identify duplicates, keep one record,
-        calculate duplicate percentage and clean data.
-      </p>
-      <span class="open">Open Tool →</span>
-    </a>
+    <div class="table-card">
+      <table class="module-table">
+        <thead>
+          <tr>
+            <th>Sr No.</th>
+            <th>Module</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="moduleTableBody">
 
-    <!-- Test Matching Tool -->
-    <a href="../test-matching/index.html" class="card">
-      <div class="icon">🔍</div>
-      <h2>Test Matching</h2>
-      <p>
-        Match tests between sheets, update prices,
-        highlight changes and export Excel.
-      </p>
-      <span class="open">Open Tool →</span>
-    </a>
+          <tr class="module-row featured-row" data-name="lab onboarding">
+            <td>01</td>
+            <td class="module-name-cell">
+              <span class="module-icon">🏥</span>
+              <span>Lab Onboarding</span>
+              <span class="badge">Featured</span>
+            </td>
+            <td><span class="type-pill">Operations</span></td>
+            <td><span class="status-pill status-live">Live</span></td>
+            <td><a href="../lab-onboarding/index.html" class="open-link">Open →</a></td>
+          </tr>
 
-    <a href="../image-tool/index.html" class="card">
-    <div class="icon">🖼️</div>
+          <tr class="module-row" data-name="duplicate tool">
+            <td>02</td>
+            <td class="module-name-cell">
+              <span class="module-icon">📄</span>
+              <span>Duplicate Tool</span>
+            </td>
+            <td><span class="type-pill">Cleaning</span></td>
+            <td><span class="status-pill status-live">Live</span></td>
+            <td><a href="../duplicate-tool/index.html" class="open-link">Open →</a></td>
+          </tr>
 
-    <h2>Image Toolkit</h2>
+          <tr class="module-row" data-name="test matching">
+            <td>03</td>
+            <td class="module-name-cell">
+              <span class="module-icon">🔍</span>
+              <span>Test Matching</span>
+            </td>
+            <td><span class="type-pill">Matching</span></td>
+            <td><span class="status-pill status-live">Live</span></td>
+            <td><a href="../test-matching/index.html" class="open-link">Open →</a></td>
+          </tr>
 
-    <p>
-        Convert JPG to PNG, PNG to JPG and download
-        optimized images instantly.
-    </p>
+          <tr class="module-row" data-name="image toolkit">
+            <td>04</td>
+            <td class="module-name-cell">
+              <span class="module-icon">🖼️</span>
+              <span>Image Toolkit</span>
+            </td>
+            <td><span class="type-pill">Utility</span></td>
+            <td><span class="status-pill status-live">Live</span></td>
+            <td><a href="../image-tool/index.html" class="open-link">Open →</a></td>
+          </tr>
 
-    <span class="open">Open Tool →</span>
-</a>
+        </tbody>
+      </table>
 
-    <!-- Lab Onboarding -->
-    <a href="../lab-onboarding/index.html" class="card">
-      <div class="icon">🏥</div>
-      <h2>Lab Onboarding</h2>
-      <p>
-        Track every lab from assigned to live, log daily progress,
-        auto-build the 6 PM report and export the full record.
-      </p>
-      <span class="open">Open Tool →</span>
-    </a>
+      <div class="no-data" id="noDataRow" style="display:none;">
+        <div class="no-data-icon">📭</div>
+        <p>No modules found</p>
+      </div>
+    </div>
 
-  </div>
+  </main>
 </div>
 
 <script>
   function logout() {
     sessionStorage.clear();
     window.location.href = "../index.html";
+  }
+
+  function filterModules() {
+    const query = document.getElementById("moduleSearch").value.trim().toLowerCase();
+    const rows = document.querySelectorAll(".module-row");
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.getAttribute("data-name");
+      const match = name.includes(query);
+      row.style.display = match ? "" : "none";
+      if (match) visibleCount++;
+    });
+
+    document.getElementById("noDataRow").style.display = visibleCount === 0 ? "flex" : "none";
   }
 </script>
 
